@@ -180,6 +180,7 @@ export default function SystemOwnerDashboard({ user, onLogout }) {
 
             <button
               type="button"
+              id="onboard-business-btn"
               onClick={() => setIsOnboardModalOpen(true)}
               style={{
                 display: 'inline-flex',
@@ -273,6 +274,7 @@ export default function SystemOwnerDashboard({ user, onLogout }) {
             />
             <input
               type="text"
+              id="search-input"
               placeholder="Search by name, slug, email, or admin..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -291,6 +293,7 @@ export default function SystemOwnerDashboard({ user, onLogout }) {
 
           <button
             type="button"
+            id="refresh-btn"
             onClick={fetchBusinesses}
             disabled={loading}
             style={{
@@ -419,6 +422,7 @@ export default function SystemOwnerDashboard({ user, onLogout }) {
                           <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
                             <button
                               type="button"
+                              id={`details-btn-${biz.slug}`}
                               onClick={() => handleOpenDetails(biz)}
                               style={{
                                 display: 'inline-flex',
@@ -441,6 +445,7 @@ export default function SystemOwnerDashboard({ user, onLogout }) {
 
                             <button
                               type="button"
+                              id={`toggle-status-btn-${biz.slug}`}
                               onClick={() => handlePromptToggleStatus(biz)}
                               style={{
                                 display: 'inline-flex',

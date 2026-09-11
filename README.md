@@ -6,7 +6,7 @@ Built with an **Express 5 + Mongoose 9** backend and a modern **React 19 + Vite*
 
 ---
 
-## Current Status: Phase 3 Completed
+## Current Status: Phase 4 Completed
 
 ### Architecture Overview Across Phases
 
@@ -15,7 +15,8 @@ Built with an **Express 5 + Mongoose 9** backend and a modern **React 19 + Vite*
 | **Phase 0** | Production Foundation, Express 5, Error Handling, Health Check, CORS, Logging | Completed | 6 tests |
 | **Phase 1** | Database Architecture, Mongoose 9 Models, Tenant Indexes, Seed Script | Completed | 29 tests |
 | **Phase 2** | JWT Cookie Authentication, Bcrypt Password Hashing, Session Validation | Completed | 18 tests |
-| **Phase 3** | RBAC, Multi-Tenant Authorization, Anti-IDOR & Tenant Isolation | **Completed** | **18 tests (71 total)** |
+| **Phase 3** | RBAC, Multi-Tenant Authorization, Anti-IDOR & Tenant Isolation | Completed | 18 tests |
+| **Phase 4** | System Owner Business Onboarding & Management, Lifecycle Control | **Completed** | **16 tests (87 total)** |
 
 ---
 
@@ -166,14 +167,39 @@ Seed data is initialized via `npm run seed --prefix backend`:
 
 ---
 
-### 8. Automated Testing & Verification
+### 8. Phase 4: System Owner Business Onboarding & Management
 
-The project includes **71 passing automated tests** across 4 suites:
+Phase 4 introduces platform-level tenant governance exclusively for the `SYSTEM_OWNER`.
+
+#### Platform Endpoints
+* **`POST /api/businesses`**: Onboards a new business tenant and its initial Business Admin in an atomic workflow.
+  * Inputs: Business details (name, optional custom slug, timezone, email, phone, address) + Admin credentials (name, email, password).
+  * Auto-generates clean, URL-safe deterministic slugs with collision resolution (`-2`, `-3`).
+  * Hashes admin password with bcrypt (work factor 12).
+  * Never exposes `passwordHash` in responses.
+* **`GET /api/businesses`**: Retrieves all registered businesses with populated administrative account summaries and live status counts.
+* **`GET /api/businesses/:businessId`**: Retrieves comprehensive business details, contact metadata, and assigned administrative account.
+* **`PATCH /api/businesses/:businessId/status`**: Toggles tenant lifecycle state (`ACTIVE` ↔ `DISABLED`).
+  * When `DISABLED`, Business Admins attempting to authenticate or access tenant endpoints receive `403 Forbidden: "Your business account has been suspended or deactivated."`.
+  * When restored to `ACTIVE`, legitimate operations resume seamlessly.
+
+#### Architecture & Security Highlights
+1. **Server-Side Validation**: Robust Zod schemas (`createBusinessSchema`, `updateBusinessStatusSchema`) with strict typing, slug regex constraints (`^[a-z0-9]+(?:-[a-z0-9]+)*$`), and email sanitization.
+2. **Transaction Consistency & Fallback Cleanup**: Uses MongoDB replica-set transactions when available. In standalone developer environments without replica sets, automatic compensating cleanup removes orphaned business records if admin creation fails.
+3. **Strict Data Exclusion**: All platform queries explicitly project `{ passwordHash: 0 }`.
+4. **Gateway Lifecycle Check**: Auth middleware verifies `business.status === 'ACTIVE'` on every request, blocking disabled tenants before any controller code executes.
+
+---
+
+### 9. Automated Testing & Verification
+
+The project includes **87 passing automated tests** across 5 suites:
 
 1. `backend/tests/health.test.js` (6 tests) — Health, rate limiting, 404, CORS.
 2. `backend/tests/models.test.js` (29 tests) — Mongoose schemas, tenant indexes, validations.
 3. `backend/tests/auth.test.js` (18 tests) — JWT cookies, login, /me, password hashing, disabled states.
 4. `backend/tests/authorization.test.js` (18 tests) — RBAC, tenant authorization, IDOR, spoofing defenses.
+5. `backend/tests/business-management.test.js` (16 tests) — Phase 4 onboarding, unique slug collisions, status toggle lifecycle, transaction atomicity, 403 blocks.
 
 Run tests:
 ```bash
@@ -182,23 +208,19 @@ npm test --prefix backend
 
 ---
 
-### 9. Live Security Verification (Manual Cross-Tenant Attack Test)
+### 10. Frontend Architecture: System Owner Dashboard
 
-A live security attack script verified the running server against 12 attack vectors:
-1. `GET /api/businesses` (System Owner) → **`200 OK`**
-2. `GET /api/businesses` (Business Admin A) → **`403 Forbidden`**
-3. `GET /api/businesses/:businessA_id` (Admin A) → **`200 OK`**
-4. `GET /api/businesses/:businessB_id` (Admin A targeting Tenant B) → **`403 Forbidden`**
-5. `GET /api/businesses/:businessA_id/services?businessId=:businessB_id` (Admin A query spoofing) → **`403 Forbidden`**
-6. `POST /api/businesses/:businessA_id/services` with body `businessId: :businessB_id` (Admin A body spoofing) → **`403 Forbidden`**
-7. `POST /api/businesses/:businessA_id/services` legitimate service creation → **`201 Created`**
-8. `POST /api/businesses/:businessB_id/services` (Admin B creating service) → **`201 Created`**
-9. `GET /api/businesses/:businessA_id/services/:serviceB_id` (Admin A IDOR attack on Service B) → **`403 Forbidden`**
-10. `GET /api/businesses/:businessB_id/services/:serviceB_id` (Admin B legitimate access) → **`200 OK`**
+The frontend includes a dedicated, responsive System Owner Dashboard for platform administrators:
+* **Real-Time Platform Metrics**: Total Registered Businesses, Active Tenants, Disabled Tenants.
+* **Search & Filter**: Real-time client-side search across business name, slug, email, and admin contact.
+* **Accessible Onboarding Flow**: Modal dialog with dual-section form (Business Metadata & Initial Admin Account) and real-time feedback.
+* **Details Inspection**: Modal providing full tenant profile, created timestamp, timezone, and admin info.
+* **Lifecycle State Dialog**: Accessible confirmation modal preventing accidental business suspensions.
+* **Strict Tenant Isolation**: Logged-in `BUSINESS_ADMIN` users receive an isolated, single-tenant view with no access to platform onboarding or cross-tenant data.
 
 ---
 
-### 10. How to Run Locally
+### 11. How to Run Locally
 
 1. **Install Dependencies**:
    ```bash
@@ -210,7 +232,12 @@ A live security attack script verified the running server against 12 attack vect
    * Backend: copy `backend/.env.example` to `backend/.env`
    * Frontend: copy `frontend/.env.example` to `frontend/.env`
 
-3. **Start Development Servers**:
+3. **Database Setup**:
+   ```bash
+   npm run seed --prefix backend
+   ```
+
+4. **Start Development Servers**:
    ```bash
    # Terminal 1: Backend API (port 5000)
    npm run dev --prefix backend
@@ -219,7 +246,7 @@ A live security attack script verified the running server against 12 attack vect
    npm run dev --prefix frontend
    ```
 
-4. **Build Frontend**:
+5. **Build Frontend**:
    ```bash
    npm run build --prefix frontend
    ```

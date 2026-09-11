@@ -84,6 +84,7 @@ export default function ConfirmDialog({
         }}>
           <button
             type="button"
+            id="cancel-dialog-btn"
             onClick={onCancel}
             disabled={isLoading}
             style={{
@@ -101,6 +102,7 @@ export default function ConfirmDialog({
           </button>
           <button
             type="button"
+            id="confirm-dialog-btn"
             onClick={onConfirm}
             disabled={isLoading}
             style={{

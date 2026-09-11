@@ -105,6 +105,7 @@ export default function BusinessDetailsModal({
             </div>
             <button
               type="button"
+              id="toggle-details-status-btn"
               onClick={() => onToggleStatus(business)}
               style={{
                 display: 'inline-flex',
@@ -236,6 +237,7 @@ export default function BusinessDetailsModal({
         }}>
           <button
             type="button"
+            id="close-details-btn"
             onClick={onClose}
             style={{
               padding: '8px 18px',

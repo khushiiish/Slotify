@@ -190,6 +190,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
                 </label>
                 <input
                   type="text"
+                  id="biz-name-input"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
@@ -215,6 +216,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
                 </label>
                 <input
                   type="text"
+                  id="biz-slug-input"
                   name="slug"
                   value={formData.slug}
                   onChange={handleChange}
@@ -238,6 +240,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
                 </label>
                 <select
                   name="timezone"
+                  id="biz-timezone-select"
                   value={formData.timezone}
                   onChange={handleChange}
                   style={{
@@ -263,6 +266,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
                 </label>
                 <input
                   type="email"
+                  id="biz-email-input"
                   name="contactEmail"
                   value={formData.contactEmail}
                   onChange={handleChange}
@@ -286,6 +290,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
                 </label>
                 <input
                   type="text"
+                  id="biz-phone-input"
                   name="contactPhone"
                   value={formData.contactPhone}
                   onChange={handleChange}
@@ -309,6 +314,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
                 </label>
                 <input
                   type="text"
+                  id="biz-address-input"
                   name="address"
                   value={formData.address}
                   onChange={handleChange}
@@ -344,6 +350,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
                 </label>
                 <input
                   type="text"
+                  id="admin-name-input"
                   name="adminName"
                   value={formData.adminName}
                   onChange={handleChange}
@@ -369,6 +376,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
                 </label>
                 <input
                   type="email"
+                  id="admin-email-input"
                   name="adminEmail"
                   value={formData.adminEmail}
                   onChange={handleChange}
@@ -394,6 +402,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
                 </label>
                 <input
                   type="password"
+                  id="admin-password-input"
                   name="adminPassword"
                   value={formData.adminPassword}
                   onChange={handleChange}
@@ -426,6 +435,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
           }}>
             <button
               type="button"
+              id="cancel-onboard-btn"
               onClick={onClose}
               disabled={loading}
               style={{
@@ -443,6 +453,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
             </button>
             <button
               type="submit"
+              id="submit-onboard-btn"
               disabled={loading}
               style={{
                 display: 'inline-flex',

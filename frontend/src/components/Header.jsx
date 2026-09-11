@@ -66,6 +66,7 @@ export default function Header({ user, onLogout }) {
         </div>
         <button
           type="button"
+          id="logout-btn"
           onClick={onLogout}
           style={{
             display: 'inline-flex',
