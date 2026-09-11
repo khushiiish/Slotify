@@ -28,3 +28,21 @@ export const validateBody = (schema) => (req, res, next) => {
   req.body = result.data;
   next();
 };
+
+/**
+ * Express middleware to validate request query parameters against a Zod schema.
+ * @param {z.ZodSchema} schema - Zod schema to validate against
+ */
+export const validateQuery = (schema) => (req, res, next) => {
+  const result = schema.safeParse(req.query);
+  if (!result.success) {
+    const firstError = result.error.issues?.[0]?.message || 'Invalid query parameters';
+    return res.status(400).json({
+      success: false,
+      message: firstError,
+    });
+  }
+  req.validatedQuery = result.data;
+  next();
+};
+

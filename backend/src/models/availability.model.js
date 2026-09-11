@@ -13,7 +13,7 @@ const availabilitySchema = new mongoose.Schema(
     staffId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Staff',
-      required: [true, 'Staff ID is required for availability'],
+      default: null,
       index: true,
     },
     dayOfWeek: {

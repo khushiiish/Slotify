@@ -6,7 +6,7 @@ Built with an **Express 5 + Mongoose 9** backend and a modern **React 19 + Vite*
 
 ---
 
-## Current Status: Phase 4 Completed
+## Current Status: Phase 6 Completed
 
 ### Architecture Overview Across Phases
 
@@ -16,7 +16,9 @@ Built with an **Express 5 + Mongoose 9** backend and a modern **React 19 + Vite*
 | **Phase 1** | Database Architecture, Mongoose 9 Models, Tenant Indexes, Seed Script | Completed | 29 tests |
 | **Phase 2** | JWT Cookie Authentication, Bcrypt Password Hashing, Session Validation | Completed | 18 tests |
 | **Phase 3** | RBAC, Multi-Tenant Authorization, Anti-IDOR & Tenant Isolation | Completed | 18 tests |
-| **Phase 4** | System Owner Business Onboarding & Management, Lifecycle Control | **Completed** | **16 tests (87 total)** |
+| **Phase 4** | System Owner Business Onboarding & Management, Lifecycle Control | Completed | 16 tests |
+| **Phase 5** | Business Admin Service & Staff Management, Safe Deletion & Reference Integrity | Completed | 31 tests |
+| **Phase 6** | Availability Management, Blocked Dates & Timezone-Aware 15-Min Slot Generation | **Completed** | **22 tests (140 total)** |
 
 ---
 
@@ -193,13 +195,15 @@ Phase 4 introduces platform-level tenant governance exclusively for the `SYSTEM_
 
 ### 9. Automated Testing & Verification
 
-The project includes **87 passing automated tests** across 5 suites:
+The project includes **140 passing automated tests** across 7 suites:
 
 1. `backend/tests/health.test.js` (6 tests) — Health, rate limiting, 404, CORS.
-2. `backend/tests/models.test.js` (29 tests) — Mongoose schemas, tenant indexes, validations.
+2. `backend/tests/models.test.js` (30 tests) — Mongoose schemas, tenant indexes, validations, staffId-null support.
 3. `backend/tests/auth.test.js` (18 tests) — JWT cookies, login, /me, password hashing, disabled states.
 4. `backend/tests/authorization.test.js` (18 tests) — RBAC, tenant authorization, IDOR, spoofing defenses.
 5. `backend/tests/business-management.test.js` (16 tests) — Phase 4 onboarding, unique slug collisions, status toggle lifecycle, transaction atomicity, 403 blocks.
+6. `backend/tests/service-staff-management.test.js` (31 tests) — Phase 5 Service and Staff CRUD, zero-trust tenant isolation, reference integrity protection, cross-tenant service assignment blocking, body spoofing defenses.
+7. `backend/tests/availability-slots.test.js` (21 tests) — Phase 6 Availability window CRUD & overlaps, blocked date management, 15-min slot interval calculation, staff overrides vs business fallback, appointment collision avoidance, boundary touch testing, zero-trust tenant isolation.
 
 Run tests:
 ```bash
@@ -208,15 +212,23 @@ npm test --prefix backend
 
 ---
 
-### 10. Frontend Architecture: System Owner Dashboard
+### 10. Frontend Architecture: Dashboards
 
-The frontend includes a dedicated, responsive System Owner Dashboard for platform administrators:
-* **Real-Time Platform Metrics**: Total Registered Businesses, Active Tenants, Disabled Tenants.
-* **Search & Filter**: Real-time client-side search across business name, slug, email, and admin contact.
-* **Accessible Onboarding Flow**: Modal dialog with dual-section form (Business Metadata & Initial Admin Account) and real-time feedback.
-* **Details Inspection**: Modal providing full tenant profile, created timestamp, timezone, and admin info.
-* **Lifecycle State Dialog**: Accessible confirmation modal preventing accidental business suspensions.
-* **Strict Tenant Isolation**: Logged-in `BUSINESS_ADMIN` users receive an isolated, single-tenant view with no access to platform onboarding or cross-tenant data.
+- **System Owner Dashboard (`/`)**:
+  * Real-Time Platform Metrics: Total Registered Businesses, Active Tenants, Disabled Tenants.
+  * Search & Filter: Real-time client-side search across business name, slug, email, and admin contact.
+  * Accessible Onboarding Flow: Modal dialog with dual-section form (Business Metadata & Initial Admin Account) and real-time validation.
+  * Details Inspection & Status Lifecycle: Modal providing full tenant profile, created timestamp, timezone, admin info, and toggle suspension controls.
+
+- **Business Admin Dashboard (`/`)**:
+  * Real-Time Tenant Metrics: Active Services, Inactive Services, Active Staff, Inactive Staff.
+  * Multi-Tab Interface:
+    - **Services Tab**: Service catalog CRUD, duration in minutes, descriptions, and active status toggles.
+    - **Staff Tab**: Staff roster management and multi-select assignment to active tenant services.
+    - **Availability & Hours Tab**: Weekly recurring operating windows grouped by day of week (Monday–Sunday), business-wide vs staff-specific scope, overlap validation, and blocked dates calendar management.
+    - **Slot Preview Tab**: Timezone-aware booking slot calculation engine showing 15-minute start interval bookable slots for any active service and date, with staff allocation badges, duration display, and empty states for blocked dates or non-working days.
+  * Safe Deletion & Status Toggles: Contextual confirmation dialogs preventing deletion when dependencies exist.
+  * Zero-Trust Isolation: Strictly scoped to the authenticated admin's business ID, completely isolating tenant data from other businesses.
 
 ---
 

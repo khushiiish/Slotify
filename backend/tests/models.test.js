@@ -185,14 +185,24 @@ describe('Phase 1 Data Models Validation & Tenant Integrity', () => {
   });
 
   describe('Availability Model', () => {
-    it('should require businessId, staffId, dayOfWeek, startTime, and endTime', async () => {
+    it('should require businessId, dayOfWeek, startTime, and endTime', async () => {
       const availability = new Availability({});
       const error = await availability.validate().catch((err) => err);
       expect(error.errors.businessId).toBeDefined();
-      expect(error.errors.staffId).toBeDefined();
       expect(error.errors.dayOfWeek).toBeDefined();
       expect(error.errors.startTime).toBeDefined();
       expect(error.errors.endTime).toBeDefined();
+    });
+
+    it('should allow business-level availability (staffId = null)', async () => {
+      const availability = new Availability({
+        businessId: dummyBusinessId,
+        staffId: null,
+        dayOfWeek: 1,
+        startTime: '09:00',
+        endTime: '17:00',
+      });
+      await expect(availability.validate()).resolves.toBeUndefined();
     });
 
     it('should reject dayOfWeek outside 0-6 range', async () => {
