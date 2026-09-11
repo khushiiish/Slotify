@@ -18,6 +18,11 @@ export const getPlatformBusinessById = async (businessId) => {
   return response.data;
 };
 
+export const getBusinessById = async (businessId) => {
+  const response = await api.get(`/businesses/${businessId}`);
+  return response.data?.data?.business || response.data?.data;
+};
+
 /**
  * Onboard a new business and create initial admin.
  * POST /api/businesses

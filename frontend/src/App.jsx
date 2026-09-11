@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getHealthStatus } from './services/health.service.js';
 import { useAuthStore } from './store/authStore.js';
 import SystemOwnerDashboard from './pages/SystemOwnerDashboard.jsx';
+import BusinessAdminDashboard from './pages/BusinessAdminDashboard.jsx';
 import './App.css';
 
 function App() {
@@ -54,6 +55,11 @@ function App() {
   // If authenticated as System Owner, render the full Platform Dashboard
   if (isAuthenticated && user?.role === 'SYSTEM_OWNER') {
     return <SystemOwnerDashboard user={user} onLogout={logout} />;
+  }
+
+  // If authenticated as Business Admin, render the Business Admin Dashboard
+  if (isAuthenticated && user?.role === 'BUSINESS_ADMIN') {
+    return <BusinessAdminDashboard user={user} onLogout={logout} />;
   }
 
   return (
