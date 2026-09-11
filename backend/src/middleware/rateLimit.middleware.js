@@ -12,3 +12,16 @@ export const apiRateLimiter = rateLimit({
     });
   },
 });
+
+export const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'test' ? 1000 : 30, // 30 login attempts per 15 mins
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      message: 'Too many login attempts from this IP, please try again later',
+    });
+  },
+});

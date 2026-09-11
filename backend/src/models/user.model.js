@@ -20,6 +20,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: {
       type: String,
       required: [true, 'Password hash is required'],
+      select: false,
     },
     role: {
       type: String,
