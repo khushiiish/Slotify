@@ -66,7 +66,7 @@ function App() {
           marginBottom: '16px',
           border: '1px solid var(--accent-border)'
         }}>
-          Phase 2 Authentication Foundation
+          Phase 3 RBAC + Multi-Tenant Authorization Foundation
         </div>
         <h1 style={{ margin: '0 0 12px 0', fontSize: '40px', color: 'var(--text-h)', fontWeight: 700 }}>
           Slotify
@@ -150,7 +150,21 @@ function App() {
                   <em>None (Platform System Owner)</em>
                 )}
               </div>
-              <div style={{ marginTop: '8px', fontSize: '13px', color: '#6b7280' }}>
+              <div style={{
+                marginTop: '12px',
+                padding: '10px 14px',
+                borderRadius: '6px',
+                background: user.role === 'SYSTEM_OWNER' ? '#eef2ff' : '#f0fdf4',
+                border: `1px solid ${user.role === 'SYSTEM_OWNER' ? '#c7d2fe' : '#bbf7d0'}`,
+                fontSize: '13px',
+                color: user.role === 'SYSTEM_OWNER' ? '#3730a3' : '#166534',
+              }}>
+                <strong>Authorization Status: </strong>
+                {user.role === 'SYSTEM_OWNER'
+                  ? 'Platform Scope Active — Authorized for platform business oversight and system operations.'
+                  : `Tenant Isolation Active — Strict multi-tenant boundary locked to Business ID: ${user.businessId}. Access to other tenants is blocked at the gateway.`}
+              </div>
+              <div style={{ marginTop: '10px', fontSize: '12px', color: '#6b7280' }}>
                 Session secured via HTTP-only cookie (<code>slotify_token</code>). Token is never exposed to JavaScript.
               </div>
             </div>
@@ -280,7 +294,22 @@ function App() {
                     cursor: 'pointer',
                   }}
                 >
-                  Urban Wellness Admin Demo
+                  Urban Wellness (Tenant A)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickFill('admin@techfix.slotify.dev', 'DevPassword123!')}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    borderRadius: '4px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
+                    color: 'var(--text)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  TechFix (Tenant B)
                 </button>
               </div>
             </div>
