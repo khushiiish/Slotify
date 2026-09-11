@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getHealthStatus } from './services/health.service.js';
 import { useAuthStore } from './store/authStore.js';
+import SystemOwnerDashboard from './pages/SystemOwnerDashboard.jsx';
 import './App.css';
 
 function App() {
@@ -50,6 +51,11 @@ function App() {
     clearError();
   };
 
+  // If authenticated as System Owner, render the full Platform Dashboard
+  if (isAuthenticated && user?.role === 'SYSTEM_OWNER') {
+    return <SystemOwnerDashboard user={user} onLogout={logout} />;
+  }
+
   return (
     <div style={{ maxWidth: '800px', margin: '40px auto', padding: '0 20px', textAlign: 'center' }}>
       <header style={{ marginBottom: '28px' }}>
@@ -66,7 +72,7 @@ function App() {
           marginBottom: '16px',
           border: '1px solid var(--accent-border)'
         }}>
-          Phase 3 RBAC + Multi-Tenant Authorization Foundation
+          Phase 4 System Owner Business Onboarding & Management
         </div>
         <h1 style={{ margin: '0 0 12px 0', fontSize: '40px', color: 'var(--text-h)', fontWeight: 700 }}>
           Slotify
@@ -91,7 +97,7 @@ function App() {
             <p>Checking authentication session...</p>
           </div>
         ) : isAuthenticated && user ? (
-          /* Authenticated User View */
+          /* Authenticated Business Admin View (Phase 3 Tenant Isolation View) */
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
@@ -101,8 +107,8 @@ function App() {
                   textTransform: 'uppercase',
                   padding: '4px 10px',
                   borderRadius: '6px',
-                  background: user.role === 'SYSTEM_OWNER' ? '#e0e7ff' : '#dcfce7',
-                  color: user.role === 'SYSTEM_OWNER' ? '#3730a3' : '#166534',
+                  background: '#dcfce7',
+                  color: '#166534',
                   letterSpacing: '0.5px',
                 }}>
                   {user.role}
@@ -144,25 +150,19 @@ function App() {
               <div><strong>Status:</strong> <span style={{ color: '#16a34a', fontWeight: 600 }}>{user.status}</span></div>
               <div>
                 <strong>Tenant Association:</strong>{' '}
-                {user.businessId ? (
-                  <code>Business ID: {user.businessId}</code>
-                ) : (
-                  <em>None (Platform System Owner)</em>
-                )}
+                <code>Business ID: {user.businessId}</code>
               </div>
               <div style={{
                 marginTop: '12px',
                 padding: '10px 14px',
                 borderRadius: '6px',
-                background: user.role === 'SYSTEM_OWNER' ? '#eef2ff' : '#f0fdf4',
-                border: `1px solid ${user.role === 'SYSTEM_OWNER' ? '#c7d2fe' : '#bbf7d0'}`,
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
                 fontSize: '13px',
-                color: user.role === 'SYSTEM_OWNER' ? '#3730a3' : '#166534',
+                color: '#166534',
               }}>
-                <strong>Authorization Status: </strong>
-                {user.role === 'SYSTEM_OWNER'
-                  ? 'Platform Scope Active — Authorized for platform business oversight and system operations.'
-                  : `Tenant Isolation Active — Strict multi-tenant boundary locked to Business ID: ${user.businessId}. Access to other tenants is blocked at the gateway.`}
+                <strong>Tenant Isolation Active: </strong>
+                Strict single-tenant boundary locked to Business ID: <code>{user.businessId}</code>. System Owner business onboarding and platform management operations are protected from tenant administrators.
               </div>
               <div style={{ marginTop: '10px', fontSize: '12px', color: '#6b7280' }}>
                 Session secured via HTTP-only cookie (<code>slotify_token</code>). Token is never exposed to JavaScript.
@@ -176,7 +176,7 @@ function App() {
               Sign In to Slotify
             </h2>
             <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: 'var(--text)' }}>
-              Sign in as System Owner or Business Admin to verify Phase 2 authentication.
+              Sign in as System Owner to access the business onboarding console, or as Business Admin.
             </p>
 
             {authError && (

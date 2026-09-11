@@ -2,9 +2,16 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { requireRole } from '../middleware/role.middleware.js';
 import { requireBusinessAccess } from '../middleware/tenant.middleware.js';
+import { validateBody } from '../validators/auth.validator.js';
+import {
+  createBusinessSchema,
+  updateBusinessStatusSchema,
+} from '../validators/business.validator.js';
 import {
   getAllBusinesses,
+  onboardBusiness,
   getBusinessById,
+  updateStatus,
   getBusinessServices,
   createBusinessService,
   getServiceById,
@@ -13,10 +20,19 @@ import {
 const router = Router();
 
 // ==========================================
-// 1. Platform-Level: SYSTEM_OWNER Only
+// 1. Platform-Level: System Owner Onboarding & Management
 // ==========================================
-// Retrieves all businesses registered across the platform.
-// BUSINESS_ADMIN receives 403 Forbidden.
+
+// Create/onboard a new business with initial Business Admin (System Owner only)
+router.post(
+  '/',
+  authenticate,
+  requireRole('SYSTEM_OWNER'),
+  validateBody(createBusinessSchema),
+  onboardBusiness
+);
+
+// Retrieves all businesses registered across the platform (System Owner only)
 router.get(
   '/',
   authenticate,
@@ -24,10 +40,19 @@ router.get(
   getAllBusinesses
 );
 
+// Enable or disable a business (System Owner only)
+router.patch(
+  '/:businessId/status',
+  authenticate,
+  requireRole('SYSTEM_OWNER'),
+  validateBody(updateBusinessStatusSchema),
+  updateStatus
+);
+
 // ==========================================
 // 2. Business Details: SYSTEM_OWNER or matching BUSINESS_ADMIN
 // ==========================================
-// SYSTEM_OWNER can view any business.
+// SYSTEM_OWNER can view any business with enriched admin data.
 // BUSINESS_ADMIN can view ONLY their own business (verified by requireBusinessAccess).
 router.get(
   '/:businessId',
@@ -38,7 +63,7 @@ router.get(
 );
 
 // ==========================================
-// 3. Tenant-Scoped Services: Read
+// 3. Tenant-Scoped Services: Read (Phase 3)
 // ==========================================
 // Lists services for the specified business.
 router.get(
@@ -50,10 +75,9 @@ router.get(
 );
 
 // ==========================================
-// 4. Tenant-Scoped Services: Create
+// 4. Tenant-Scoped Services: Create (Phase 3)
 // ==========================================
-// Creates a service for the business.
-// Authoritative businessId is forced from req.user.businessId.
+// Creates a service for the business. Authoritative businessId from req.user.
 router.post(
   '/:businessId/services',
   authenticate,
@@ -63,9 +87,8 @@ router.post(
 );
 
 // ==========================================
-// 5. Tenant-Scoped Services: IDOR Protection
+// 5. Tenant-Scoped Services: IDOR Protection (Phase 3)
 // ==========================================
-// Retrieves a specific service by ID, asserting tenant ownership.
 router.get(
   '/:businessId/services/:serviceId',
   authenticate,
