@@ -122,3 +122,29 @@ export const formatTimeInTimezone = (date, timeZone = 'UTC') => {
   }
   return `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
 };
+
+/**
+ * Formats a Date object in the specified timezone as "YYYY-MM-DD"
+ *
+ * @param {Date} date - Date object
+ * @param {string} timeZone - IANA timezone
+ * @returns {string} "YYYY-MM-DD"
+ */
+export const formatDateInTimezone = (date, timeZone = 'UTC') => {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = formatter.formatToParts(date);
+  let year = '';
+  let month = '';
+  let day = '';
+  for (const p of parts) {
+    if (p.type === 'year') year = p.value;
+    if (p.type === 'month') month = p.value;
+    if (p.type === 'day') day = p.value;
+  }
+  return `${year}-${month}-${day}`;
+};

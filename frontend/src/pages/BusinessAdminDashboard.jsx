@@ -20,6 +20,16 @@ import {
   updateBlockedDate,
   deleteBlockedDate,
 } from '../services/blockedDate.service.js';
+import {
+  getAppointments,
+  createAppointment,
+  cancelAppointment,
+  updateAppointmentStatus,
+} from '../services/appointment.service.js';
+import AppointmentCalendar from '../components/AppointmentCalendar.jsx';
+import AppointmentDetailsModal from '../components/AppointmentDetailsModal.jsx';
+import { BookAppointmentModal } from '../components/BookAppointmentModal.jsx';
+import AnalyticsView from '../components/AnalyticsView.jsx';
 import { getBusinessById } from '../services/business.service.js';
 import {
   Scissors,
@@ -39,12 +49,19 @@ import {
   Building2,
   Calendar,
   CalendarX,
+  CalendarCheck,
+  CalendarDays,
   Sparkles,
   Layers,
   AlertCircle,
   ChevronRight,
   Globe,
+  Eye,
+  List,
+  UserX,
+  BarChart3,
 } from 'lucide-react';
+
 
 const DAYS_MAP = {
   0: 'Sunday',
@@ -57,7 +74,7 @@ const DAYS_MAP = {
 };
 
 export default function BusinessAdminDashboard({ user, onLogout }) {
-  const [activeTab, setActiveTab] = useState('services'); // 'services' | 'staff' | 'availability' | 'slots'
+  const [activeTab, setActiveTab] = useState('services'); // 'services' | 'staff' | 'availability' | 'slots' | 'appointments'
   const [businessInfo, setBusinessInfo] = useState(null);
 
   // Data states
@@ -65,13 +82,26 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
   const [staff, setStaff] = useState([]);
   const [availabilityList, setAvailabilityList] = useState([]);
   const [blockedDates, setBlockedDates] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
-  // Search queries
+  // Search & Filter queries
   const [serviceSearch, setServiceSearch] = useState('');
   const [staffSearch, setStaffSearch] = useState('');
+  const [appointmentSubView, setAppointmentSubView] = useState('list'); // 'list' | 'calendar'
+  const [appointmentSearch, setAppointmentSearch] = useState('');
+  const [appointmentFilterService, setAppointmentFilterService] = useState('');
+  const [appointmentFilterStaff, setAppointmentFilterStaff] = useState('');
+  const [appointmentFilterStatus, setAppointmentFilterStatus] = useState('');
+  const [appointmentFilterDate, setAppointmentFilterDate] = useState('');
+
+  // Appointment details modal state
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+
 
   // Modal states
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
@@ -85,6 +115,8 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
 
   const [isBlockedDateModalOpen, setIsBlockedDateModalOpen] = useState(false);
   const [blockedDateToEdit, setBlockedDateToEdit] = useState(null);
+
+  const [isBookModalOpen, setIsBookModalOpen] = useState(false);
 
   // Slot Preview Engine State
   const tomorrowStr = useMemo(() => {
@@ -124,17 +156,19 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
       }
 
       // Fetch all tenant operational data in parallel
-      const [servicesData, staffData, availData, blockedData] = await Promise.all([
+      const [servicesData, staffData, availData, blockedData, appointmentsData] = await Promise.all([
         getServices(),
         getStaffList(),
         getAvailabilityList(),
         getBlockedDates(),
+        getAppointments().catch(() => ({ data: [] })),
       ]);
 
       setServices(servicesData);
       setStaff(staffData);
       setAvailabilityList(availData);
       setBlockedDates(blockedData);
+      setAppointments(appointmentsData?.data || []);
 
       // Initialize preview service if not set
       if (!previewServiceId && servicesData.length > 0) {
@@ -160,6 +194,7 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
     const inactiveStaff = staff.filter((st) => st.status === 'INACTIVE').length;
     const activeWindows = availabilityList.filter((a) => a.isActive).length;
     const totalBlocked = blockedDates.length;
+    const confirmedAppointments = appointments.filter((a) => a.status === 'CONFIRMED').length;
 
     return {
       activeServices,
@@ -168,8 +203,9 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
       inactiveStaff,
       activeWindows,
       totalBlocked,
+      confirmedAppointments,
     };
-  }, [services, staff, availabilityList, blockedDates]);
+  }, [services, staff, availabilityList, blockedDates, appointments]);
 
   // Filtered lists
   const filteredServices = useMemo(() => {
@@ -419,8 +455,142 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
     }
   };
 
+  // --- Appointment Actions ---
+  const handleSaveAppointment = async (bookingPayload) => {
+    await createAppointment(bookingPayload);
+    showSuccess('Appointment booked successfully!');
+    await fetchData();
+  };
+
+  const handleCancelAppointment = (appt) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Cancel Appointment',
+      message: `Are you sure you want to cancel the appointment for ${appt.customerName}? The time slot will immediately become available for other customers.`,
+      confirmText: 'Cancel Appointment',
+      confirmStyle: 'danger',
+      onConfirm: async () => {
+        try {
+          await cancelAppointment(appt._id);
+          showSuccess('Appointment cancelled successfully.');
+          await fetchData();
+        } catch (err) {
+          setError(err.response?.data?.message || err.message || 'Failed to cancel appointment.');
+        } finally {
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        }
+      },
+    });
+  };
+
   const businessDisplayName = businessInfo?.name || 'Your Business';
   const businessTimezone = businessInfo?.timezone || 'Asia/Kolkata';
+
+  const handleOpenAppointmentDetails = (appt) => {
+    setSelectedAppointment(appt);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleUpdateAppointmentStatus = (targetStatus) => {
+    if (!selectedAppointment) return;
+
+    let title = 'Update Appointment';
+    let message = `Are you sure you want to mark this appointment as ${targetStatus}?`;
+    let confirmStyle = 'primary';
+    let confirmText = `Mark ${targetStatus}`;
+
+    if (targetStatus === 'CANCELLED') {
+      title = 'Cancel Appointment';
+      message = `Are you sure you want to cancel the appointment for ${selectedAppointment.customerName}? The time slot will immediately become available for other customers.`;
+      confirmStyle = 'danger';
+      confirmText = 'Cancel Appointment';
+    } else if (targetStatus === 'COMPLETED') {
+      title = 'Complete Appointment';
+      message = `Mark appointment for ${selectedAppointment.customerName} as COMPLETED?`;
+      confirmText = 'Mark Completed';
+    } else if (targetStatus === 'NO_SHOW') {
+      title = 'Mark No-Show';
+      message = `Mark appointment for ${selectedAppointment.customerName} as NO-SHOW?`;
+      confirmStyle = 'danger';
+      confirmText = 'Mark No-Show';
+    }
+
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      message,
+      confirmText,
+      confirmStyle,
+      onConfirm: async () => {
+        setDetailsLoading(true);
+        try {
+          await updateAppointmentStatus(selectedAppointment._id, targetStatus);
+          showSuccess(`Appointment marked as ${targetStatus}.`);
+          setIsDetailsModalOpen(false);
+          setSelectedAppointment(null);
+          await fetchData();
+        } catch (err) {
+          setError(err.response?.data?.message || err.message || `Failed to update status to ${targetStatus}.`);
+        } finally {
+          setDetailsLoading(false);
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        }
+      },
+    });
+  };
+
+  const filteredAppointments = useMemo(() => {
+    return appointments.filter((appt) => {
+      if (appointmentFilterStatus && appt.status !== appointmentFilterStatus) {
+        return false;
+      }
+      if (appointmentFilterService) {
+        const sId = appt.serviceId?._id || appt.serviceId;
+        if (sId !== appointmentFilterService) return false;
+      }
+      if (appointmentFilterStaff) {
+        const stId = appt.staffId?._id || appt.staffId;
+        if (stId !== appointmentFilterStaff) return false;
+      }
+      if (appointmentFilterDate) {
+        try {
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: businessTimezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          });
+          const parts = formatter.formatToParts(new Date(appt.startTime));
+          const partMap = {};
+          for (const p of parts) partMap[p.type] = p.value;
+          const apptDateStr = `${partMap.year}-${partMap.month}-${partMap.day}`;
+          if (apptDateStr !== appointmentFilterDate) return false;
+        } catch {
+          const apptDateStr = new Date(appt.startTime).toISOString().split('T')[0];
+          if (apptDateStr !== appointmentFilterDate) return false;
+        }
+      }
+      if (appointmentSearch && appointmentSearch.trim()) {
+        const q = appointmentSearch.toLowerCase().trim();
+        const name = (appt.customerName || '').toLowerCase();
+        const email = (appt.customerEmail || '').toLowerCase();
+        const phone = (appt.customerPhone || '').toLowerCase();
+        if (!name.includes(q) && !email.includes(q) && !phone.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [
+    appointments,
+    appointmentFilterStatus,
+    appointmentFilterService,
+    appointmentFilterStaff,
+    appointmentFilterDate,
+    appointmentSearch,
+    businessTimezone,
+  ]);
+
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
@@ -624,6 +794,30 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
                   </button>
                 </div>
               )}
+
+              {activeTab === 'appointments' && (
+                <button
+                  type="button"
+                  id="create-appointment-btn"
+                  onClick={() => setIsBookModalOpen(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '9px 18px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Plus size={16} />
+                  Book Test Appointment
+                </button>
+              )}
             </div>
           </div>
 
@@ -631,7 +825,7 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
               gap: '16px',
               marginTop: '22px',
             }}
@@ -673,6 +867,16 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
               </div>
               <div style={{ fontSize: '30px', fontWeight: 800, color: '#f43f5e', marginTop: '6px' }}>
                 {metrics.totalBlocked}
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--code-bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px 20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text)', fontSize: '13px', fontWeight: 600 }}>
+                <span>APPOINTMENTS</span>
+                <CalendarCheck size={18} color="#eab308" />
+              </div>
+              <div style={{ fontSize: '30px', fontWeight: 800, color: '#eab308', marginTop: '6px' }}>
+                {metrics.confirmedAppointments}
               </div>
             </div>
           </div>
@@ -774,6 +978,54 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
           >
             <Sparkles size={16} />
             Slot Preview
+          </button>
+
+          <button
+            type="button"
+            id="tab-appointments-btn"
+            onClick={() => setActiveTab('appointments')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              border: 'none',
+              background: 'transparent',
+              color: activeTab === 'appointments' ? 'var(--accent)' : 'var(--text)',
+              fontWeight: 700,
+              fontSize: '14px',
+              cursor: 'pointer',
+              borderBottom: activeTab === 'appointments' ? '2px solid var(--accent)' : '2px solid transparent',
+              marginBottom: '-1px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <CalendarCheck size={16} />
+            Appointments ({appointments.length})
+          </button>
+
+          <button
+            type="button"
+            id="tab-analytics-btn"
+            onClick={() => setActiveTab('analytics')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              border: 'none',
+              background: 'transparent',
+              color: activeTab === 'analytics' ? 'var(--accent)' : 'var(--text)',
+              fontWeight: 700,
+              fontSize: '14px',
+              cursor: 'pointer',
+              borderBottom: activeTab === 'analytics' ? '2px solid var(--accent)' : '2px solid transparent',
+              marginBottom: '-1px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <BarChart3 size={16} />
+            Analytics & Insights
           </button>
         </div>
 
@@ -1675,6 +1927,513 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
             )}
           </div>
         )}
+
+        {/* Tab 5: Appointments Management */}
+        {activeTab === 'appointments' && (
+          <div id="appointments-tab-content">
+            {/* Top Toolbar: Sub-view Switcher & Action */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '18px',
+                flexWrap: 'wrap',
+                gap: '12px',
+              }}
+            >
+              {/* View Mode Toggle: List vs Calendar */}
+              <div
+                style={{
+                  display: 'inline-flex',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--code-bg)',
+                  padding: '3px',
+                  gap: '4px',
+                }}
+              >
+                <button
+                  type="button"
+                  id="view-mode-list-btn"
+                  onClick={() => setAppointmentSubView('list')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: appointmentSubView === 'list' ? 'var(--accent)' : 'transparent',
+                    color: appointmentSubView === 'list' ? '#fff' : 'var(--text)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <List size={15} />
+                  List View
+                </button>
+                <button
+                  type="button"
+                  id="view-mode-calendar-btn"
+                  onClick={() => setAppointmentSubView('calendar')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: appointmentSubView === 'calendar' ? 'var(--accent)' : 'transparent',
+                    color: appointmentSubView === 'calendar' ? '#fff' : 'var(--text)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <CalendarDays size={15} />
+                  Calendar View
+                </button>
+              </div>
+
+              <div style={{ fontSize: '13px', color: 'var(--text)' }}>
+                Showing <strong>{filteredAppointments.length}</strong> of {appointments.length} appointments
+              </div>
+            </div>
+
+            {/* Comprehensive Filter & Search Bar */}
+            <div
+              id="appointments-filter-bar"
+              style={{
+                background: 'var(--code-bg)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                padding: '16px',
+                marginBottom: '20px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '12px',
+                alignItems: 'center',
+              }}
+            >
+              {/* Customer Search Input */}
+              <div style={{ position: 'relative' }}>
+                <Search
+                  size={15}
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--text)',
+                    opacity: 0.6,
+                  }}
+                />
+                <input
+                  type="text"
+                  id="appointment-search-input"
+                  placeholder="Search customer name, email, phone..."
+                  value={appointmentSearch}
+                  onChange={(e) => setAppointmentSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px 8px 34px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
+                    color: 'var(--text-h)',
+                    fontSize: '13px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <select
+                  id="appointment-status-filter"
+                  value={appointmentFilterStatus}
+                  onChange={(e) => setAppointmentFilterStatus(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
+                    color: 'var(--text-h)',
+                    fontSize: '13px',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <option value="">All Statuses</option>
+                  <option value="CONFIRMED">CONFIRMED</option>
+                  <option value="COMPLETED">COMPLETED</option>
+                  <option value="CANCELLED">CANCELLED</option>
+                  <option value="NO_SHOW">NO_SHOW</option>
+                </select>
+              </div>
+
+              {/* Service Filter */}
+              <div>
+                <select
+                  id="appointment-service-filter"
+                  value={appointmentFilterService}
+                  onChange={(e) => setAppointmentFilterService(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
+                    color: 'var(--text-h)',
+                    fontSize: '13px',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <option value="">All Services</option>
+                  {services.map((s) => (
+                    <option key={s._id} value={s._id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Staff Filter */}
+              <div>
+                <select
+                  id="appointment-staff-filter"
+                  value={appointmentFilterStaff}
+                  onChange={(e) => setAppointmentFilterStaff(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
+                    color: 'var(--text-h)',
+                    fontSize: '13px',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <option value="">All Staff</option>
+                  {staff.map((st) => (
+                    <option key={st._id} value={st._id}>
+                      {st.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date Filter */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="date"
+                  id="appointment-date-filter"
+                  value={appointmentFilterDate}
+                  onChange={(e) => setAppointmentFilterDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '7px 10px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
+                    color: 'var(--text-h)',
+                    fontSize: '13px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+
+                {(appointmentSearch ||
+                  appointmentFilterStatus ||
+                  appointmentFilterService ||
+                  appointmentFilterStaff ||
+                  appointmentFilterDate) && (
+                  <button
+                    type="button"
+                    id="clear-appointment-filters-btn"
+                    onClick={() => {
+                      setAppointmentSearch('');
+                      setAppointmentFilterStatus('');
+                      setAppointmentFilterService('');
+                      setAppointmentFilterStaff('');
+                      setAppointmentFilterDate('');
+                    }}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      background: 'transparent',
+                      color: 'var(--text)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Sub-view: CALENDAR VIEW */}
+            {appointmentSubView === 'calendar' && (
+              <AppointmentCalendar
+                appointments={filteredAppointments}
+                timezone={businessTimezone}
+                onSelectAppointment={handleOpenAppointmentDetails}
+              />
+            )}
+
+            {/* Sub-view: LIST VIEW */}
+            {appointmentSubView === 'list' && (
+              <div>
+                {filteredAppointments.length === 0 ? (
+                  <div
+                    id="no-appointments-view"
+                    style={{
+                      padding: '60px 20px',
+                      textAlign: 'center',
+                      background: 'var(--code-bg)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '10px',
+                    }}
+                  >
+                    <CalendarCheck size={40} color="var(--text)" style={{ opacity: 0.3, marginBottom: '10px' }} />
+                    <h3 style={{ margin: '0 0 6px', color: 'var(--text-h)', fontSize: '16px' }}>
+                      No appointments found
+                    </h3>
+                    <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--text)', maxWidth: '480px', marginInline: 'auto' }}>
+                      {appointmentSearch || appointmentFilterStatus || appointmentFilterDate
+                        ? 'Try clearing filters to see more appointments.'
+                        : 'Book an appointment to verify your schedule, services, and staff availability.'}
+                    </p>
+                    <button
+                      type="button"
+                      id="empty-state-book-btn"
+                      onClick={() => setIsBookModalOpen(true)}
+                      style={{
+                        padding: '9px 18px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: 'var(--accent)',
+                        color: '#fff',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Plus size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+                      Book Test Appointment
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    id="appointments-table-container"
+                    style={{
+                      background: 'var(--code-bg)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '10px',
+                      overflowX: 'auto',
+                    }}
+                  >
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text)', textTransform: 'uppercase', fontSize: '11px' }}>
+                          <th style={{ padding: '14px 18px' }}>Customer</th>
+                          <th style={{ padding: '14px 18px' }}>Service</th>
+                          <th style={{ padding: '14px 18px' }}>Staff</th>
+                          <th style={{ padding: '14px 18px' }}>Date & Time</th>
+                          <th style={{ padding: '14px 18px' }}>Status</th>
+                          <th style={{ padding: '14px 18px', textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredAppointments.map((appt) => {
+                          // Format in business timezone
+                          let dateFormatted = '';
+                          let timeStr = '';
+                          try {
+                            const d = new Date(appt.startTime);
+                            const formatter = new Intl.DateTimeFormat('en-US', {
+                              timeZone: businessTimezone,
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false,
+                            });
+                            const parts = formatter.formatToParts(d);
+                            const pMap = {};
+                            for (const p of parts) pMap[p.type] = p.value;
+                            dateFormatted = `${pMap.month} ${pMap.day}, ${pMap.year}`;
+                            timeStr = `${pMap.hour}:${pMap.minute}`;
+                          } catch {
+                            const apptDate = new Date(appt.startTime);
+                            timeStr = apptDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+                            dateFormatted = apptDate.toISOString().split('T')[0];
+                          }
+
+                          const isConfirmed = appt.status === 'CONFIRMED';
+                          const isCancelled = appt.status === 'CANCELLED';
+                          const isCompleted = appt.status === 'COMPLETED';
+                          const isNoShow = appt.status === 'NO_SHOW';
+
+                          return (
+                            <tr
+                              key={appt._id}
+                              id={`appointment-row-${appt._id}`}
+                              style={{
+                                borderBottom: '1px solid var(--border)',
+                                opacity: isCancelled ? 0.6 : 1,
+                              }}
+                            >
+                              <td style={{ padding: '14px 18px' }}>
+                                <div style={{ fontWeight: 600, color: 'var(--text-h)' }}>{appt.customerName}</div>
+                                <div style={{ fontSize: '12px', color: 'var(--text)', opacity: 0.8 }}>{appt.customerEmail}</div>
+                                {appt.customerPhone && (
+                                  <div style={{ fontSize: '11px', color: 'var(--text)', opacity: 0.6 }}>{appt.customerPhone}</div>
+                                )}
+                              </td>
+                              <td style={{ padding: '14px 18px' }}>
+                                <span style={{ fontWeight: 600, color: 'var(--text-h)' }}>
+                                  {appt.serviceId?.name || 'Service'}
+                                </span>
+                                <div style={{ fontSize: '11px', color: 'var(--accent)' }}>
+                                  {appt.serviceId?.durationMinutes ? `${appt.serviceId.durationMinutes} mins` : ''}
+                                </div>
+                              </td>
+                              <td style={{ padding: '14px 18px' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-h)' }}>
+                                  <Users size={13} color="var(--accent)" />
+                                  {appt.staffId?.name || 'Unassigned'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '14px 18px' }}>
+                                <div style={{ fontWeight: 600, color: 'var(--text-h)' }}>{dateFormatted}</div>
+                                <div style={{ fontSize: '12px', color: 'var(--text)' }}>
+                                  {timeStr} <span style={{ opacity: 0.6, fontSize: '10px' }}>({businessTimezone})</span>
+                                </div>
+                              </td>
+                              <td style={{ padding: '14px 18px' }}>
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    padding: '3px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    backgroundColor:
+                                      isConfirmed
+                                        ? 'rgba(34, 197, 94, 0.15)'
+                                        : isCompleted
+                                        ? 'rgba(59, 130, 246, 0.15)'
+                                        : isCancelled
+                                        ? 'rgba(239, 68, 68, 0.15)'
+                                        : 'rgba(234, 179, 8, 0.15)',
+                                    color:
+                                      isConfirmed
+                                        ? '#22c55e'
+                                        : isCompleted
+                                        ? '#3b82f6'
+                                        : isCancelled
+                                        ? '#ef4444'
+                                        : '#eab308',
+                                  }}
+                                >
+                                  {appt.status}
+                                </span>
+                              </td>
+                              <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+                                <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                  <button
+                                    type="button"
+                                    id={`view-details-${appt._id}-btn`}
+                                    onClick={() => handleOpenAppointmentDetails(appt)}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      padding: '6px 10px',
+                                      borderRadius: '6px',
+                                      border: '1px solid var(--border)',
+                                      background: 'var(--bg)',
+                                      color: 'var(--text-h)',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                    }}
+                                    title="View Details"
+                                  >
+                                    <Eye size={13} />
+                                    Details
+                                  </button>
+
+                                  {isConfirmed && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        id={`complete-appointment-${appt._id}-btn`}
+                                        onClick={() => {
+                                          setSelectedAppointment(appt);
+                                          handleUpdateAppointmentStatus('COMPLETED');
+                                        }}
+                                        style={{
+                                          padding: '6px 10px',
+                                          borderRadius: '6px',
+                                          border: '1px solid rgba(59, 130, 246, 0.3)',
+                                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                          color: '#3b82f6',
+                                          fontSize: '12px',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                        }}
+                                        title="Mark Completed"
+                                      >
+                                        Complete
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        id={`cancel-appointment-${appt._id}-btn`}
+                                        onClick={() => handleCancelAppointment(appt)}
+                                        style={{
+                                          padding: '6px 10px',
+                                          borderRadius: '6px',
+                                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                                          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                          color: '#ef4444',
+                                          fontSize: '12px',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                        }}
+                                        title="Cancel Appointment"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 6: Business Analytics & Insights */}
+        {activeTab === 'analytics' && (
+          <AnalyticsView business={businessInfo} />
+        )}
       </main>
 
       {/* Modals & Dialogs */}
@@ -1709,6 +2468,26 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
         onSuccess={handleSaveBlockedDate}
       />
 
+      <BookAppointmentModal
+        isOpen={isBookModalOpen}
+        onClose={() => setIsBookModalOpen(false)}
+        onSave={handleSaveAppointment}
+        services={services}
+        staff={staff}
+      />
+
+      <AppointmentDetailsModal
+        isOpen={isDetailsModalOpen}
+        appointment={selectedAppointment}
+        timezone={businessTimezone}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedAppointment(null);
+        }}
+        onStatusUpdate={handleUpdateAppointmentStatus}
+        loading={detailsLoading}
+      />
+
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         title={confirmDialog.title}
@@ -1721,3 +2500,4 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
     </div>
   );
 }
+

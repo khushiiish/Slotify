@@ -7,6 +7,10 @@ import staffRoutes from './staff.routes.js';
 import availabilityRoutes from './availability.routes.js';
 import blockedDateRoutes from './blockedDate.routes.js';
 
+import appointmentRoutes from './appointment.routes.js';
+import publicRoutes from './public.routes.js';
+import analyticsRoutes from './analytics.routes.js';
+
 const router = Router();
 
 // Health Check Route
@@ -26,8 +30,13 @@ router.use('/staff', staffRoutes);
 router.use('/availability', availabilityRoutes);
 router.use('/blocked-dates', blockedDateRoutes);
 
-// Future Phase Routes
-// router.use('/appointments', appointmentRoutes);
-// router.use('/customers', customerRoutes);
+// Phase 7: Booking Engine & Appointment Management
+router.use('/appointments', appointmentRoutes);
+
+// Phase 8: Public Scheduling & Customer Experience
+router.use('/public', publicRoutes);
+
+// Phase 10: Business Admin & Platform Analytics
+router.use('/analytics', analyticsRoutes);
 
 export default router;

@@ -3,6 +3,10 @@ import { getHealthStatus } from './services/health.service.js';
 import { useAuthStore } from './store/authStore.js';
 import SystemOwnerDashboard from './pages/SystemOwnerDashboard.jsx';
 import BusinessAdminDashboard from './pages/BusinessAdminDashboard.jsx';
+import PublicBookingPage from './pages/PublicBookingPage.jsx';
+import CustomerAppointmentView from './pages/CustomerAppointmentView.jsx';
+import LandingPage from './pages/LandingPage.jsx';
+import { Calendar, UserCheck, LogOut, LayoutDashboard, Globe } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -14,10 +18,30 @@ function App() {
   // Auth store
   const { user, isAuthenticated, isLoading: authLoading, error: authError, login, logout, checkAuth, clearError } = useAuthStore();
 
-  // Form state
+  // Form state for login
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Path routing
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [searchParams, setSearchParams] = useState(window.location.search);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+      setSearchParams(window.location.search);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = (url) => {
+    window.history.pushState({}, '', url);
+    setCurrentPath(window.location.pathname);
+    setSearchParams(window.location.search);
+    window.scrollTo(0, 0);
+  };
 
   const checkConnection = async () => {
     setHealthLoading(true);
@@ -42,8 +66,11 @@ function App() {
     e.preventDefault();
     clearError();
     setSubmitting(true);
-    await login({ email, password });
+    const success = await login({ email, password });
     setSubmitting(false);
+    if (success) {
+      navigateTo('/');
+    }
   };
 
   const handleQuickFill = (demoEmail, demoPass) => {
@@ -52,19 +79,156 @@ function App() {
     clearError();
   };
 
-  // If authenticated as System Owner, render the full Platform Dashboard
-  if (isAuthenticated && user?.role === 'SYSTEM_OWNER') {
-    return <SystemOwnerDashboard user={user} onLogout={logout} />;
+  // 1. Check if on public booking page /book/:slug
+  if (currentPath.startsWith('/book/')) {
+    const slug = currentPath.replace('/book/', '').split('/')[0];
+    return (
+      <div>
+        <nav style={{
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--code-bg)',
+          padding: '12px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <button
+            type="button"
+            onClick={() => navigateTo('/')}
+            style={{ background: 'none', border: 'none', color: 'var(--text-h)', fontSize: '18px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <Calendar size={20} color="var(--accent)" />
+            Slotify
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={() => navigateTo('/')}
+              style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: '13px', cursor: 'pointer' }}
+            >
+              All Portals
+            </button>
+            <button
+              type="button"
+              id="header-signin-btn"
+              onClick={() => navigateTo(isAuthenticated ? '/' : '/login')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: 'var(--bg)',
+                color: 'var(--text-h)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {isAuthenticated ? 'Dashboard' : 'Sign In'}
+            </button>
+          </div>
+        </nav>
+        <PublicBookingPage slug={slug} onNavigate={navigateTo} />
+      </div>
+    );
   }
 
-  // If authenticated as Business Admin, render the Business Admin Dashboard
-  if (isAuthenticated && user?.role === 'BUSINESS_ADMIN') {
-    return <BusinessAdminDashboard user={user} onLogout={logout} />;
+  // 2. Check if on customer appointment view /appointments/:id
+  if (currentPath.startsWith('/appointments/')) {
+    const appointmentId = currentPath.replace('/appointments/', '').split('/')[0];
+    const token = new URLSearchParams(searchParams).get('token') || '';
+    return (
+      <div>
+        <nav style={{
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--code-bg)',
+          padding: '12px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <button
+            type="button"
+            onClick={() => navigateTo('/')}
+            style={{ background: 'none', border: 'none', color: 'var(--text-h)', fontSize: '18px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <Calendar size={20} color="var(--accent)" />
+            Slotify
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={() => navigateTo('/')}
+              style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: '13px', cursor: 'pointer' }}
+            >
+              Home
+            </button>
+          </div>
+        </nav>
+        <CustomerAppointmentView appointmentId={appointmentId} token={token} onNavigate={navigateTo} />
+      </div>
+    );
   }
 
+  // 3. Authenticated Dashboards on root route '/'
+  if (currentPath === '/' && isAuthenticated) {
+    if (user?.role === 'SYSTEM_OWNER') {
+      return <SystemOwnerDashboard user={user} onLogout={logout} />;
+    }
+    if (user?.role === 'BUSINESS_ADMIN') {
+      return <BusinessAdminDashboard user={user} onLogout={logout} />;
+    }
+  }
+
+  // 4. Landing Page on root route '/' when unauthenticated
+  if (currentPath === '/' && !isAuthenticated) {
+    return (
+      <div>
+        <nav style={{
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--code-bg)',
+          padding: '12px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-h)', fontSize: '18px', fontWeight: 800 }}>
+            <Calendar size={20} color="var(--accent)" />
+            Slotify
+          </div>
+          <button
+            type="button"
+            id="nav-login-btn"
+            onClick={() => navigateTo('/login')}
+            style={{
+              padding: '7px 16px',
+              borderRadius: '8px',
+              border: '1px solid var(--border)',
+              background: 'var(--accent)',
+              color: '#fff',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Admin Sign In
+          </button>
+        </nav>
+        <LandingPage onNavigate={navigateTo} />
+      </div>
+    );
+  }
+
+  // 5. Explicit Login Route '/login'
   return (
     <div style={{ maxWidth: '800px', margin: '40px auto', padding: '0 20px', textAlign: 'center' }}>
       <header style={{ marginBottom: '28px' }}>
+        <button
+          type="button"
+          onClick={() => navigateTo('/')}
+          style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: '13px', cursor: 'pointer', marginBottom: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          ← Return to Public Home
+        </button>
         <div style={{
           display: 'inline-block',
           padding: '6px 14px',
@@ -78,7 +242,7 @@ function App() {
           marginBottom: '16px',
           border: '1px solid var(--accent-border)'
         }}>
-          Phase 4 System Owner Business Onboarding & Management
+          Slotify Platform Console
         </div>
         <h1 style={{ margin: '0 0 12px 0', fontSize: '40px', color: 'var(--text-h)', fontWeight: 700 }}>
           Slotify
@@ -103,7 +267,6 @@ function App() {
             <p>Checking authentication session...</p>
           </div>
         ) : isAuthenticated && user ? (
-          /* Authenticated Business Admin View (Phase 3 Tenant Isolation View) */
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
@@ -123,66 +286,49 @@ function App() {
                   Welcome, {user.name}
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={logout}
-                style={{
-                  padding: '8px 18px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  borderRadius: '6px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg)',
-                  color: '#dc2626',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                Log Out
-              </button>
-            </div>
-
-            <div style={{
-              background: 'var(--bg)',
-              border: '1px solid var(--border)',
-              borderRadius: '8px',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: 1.8,
-              color: 'var(--text)'
-            }}>
-              <div><strong>Email:</strong> {user.email}</div>
-              <div><strong>User ID:</strong> <code>{user.id}</code></div>
-              <div><strong>Status:</strong> <span style={{ color: '#16a34a', fontWeight: 600 }}>{user.status}</span></div>
-              <div>
-                <strong>Tenant Association:</strong>{' '}
-                <code>Business ID: {user.businessId}</code>
-              </div>
-              <div style={{
-                marginTop: '12px',
-                padding: '10px 14px',
-                borderRadius: '6px',
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                fontSize: '13px',
-                color: '#166534',
-              }}>
-                <strong>Tenant Isolation Active: </strong>
-                Strict single-tenant boundary locked to Business ID: <code>{user.businessId}</code>. System Owner business onboarding and platform management operations are protected from tenant administrators.
-              </div>
-              <div style={{ marginTop: '10px', fontSize: '12px', color: '#6b7280' }}>
-                Session secured via HTTP-only cookie (<code>slotify_token</code>). Token is never exposed to JavaScript.
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => navigateTo('/')}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Open Dashboard
+                </button>
+                <button
+                  type="button"
+                  onClick={logout}
+                  style={{
+                    padding: '8px 18px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
+                    color: '#dc2626',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Log Out
+                </button>
               </div>
             </div>
           </div>
         ) : (
-          /* Unauthenticated Login View */
           <div>
             <h2 style={{ margin: '0 0 8px 0', fontSize: '20px', color: 'var(--text-h)' }}>
               Sign In to Slotify
             </h2>
             <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: 'var(--text)' }}>
-              Sign in as System Owner to access the business onboarding console, or as Business Admin.
+              Sign in as System Owner or Business Admin.
             </p>
 
             {authError && (
@@ -200,34 +346,36 @@ function App() {
             )}
 
             <form onSubmit={handleLoginSubmit}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--text-h)' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: 'var(--text-h)', marginBottom: '6px' }}>
                   Email Address
                 </label>
                 <input
+                  id="login-email-input"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
+                  placeholder="admin@urbanwellness.slotify.dev"
                   required
                   style={{
                     width: '100%',
-                    boxSizing: 'border-box',
                     padding: '10px 12px',
+                    fontSize: '14px',
                     borderRadius: '6px',
                     border: '1px solid var(--border)',
                     background: 'var(--bg)',
                     color: 'var(--text-h)',
-                    fontSize: '14px',
+                    boxSizing: 'border-box',
                   }}
                 />
               </div>
 
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--text-h)' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: 'var(--text-h)', marginBottom: '6px' }}>
                   Password
                 </label>
                 <input
+                  id="login-password-input"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -235,87 +383,91 @@ function App() {
                   required
                   style={{
                     width: '100%',
-                    boxSizing: 'border-box',
                     padding: '10px 12px',
+                    fontSize: '14px',
                     borderRadius: '6px',
                     border: '1px solid var(--border)',
                     background: 'var(--bg)',
                     color: 'var(--text-h)',
-                    fontSize: '14px',
+                    boxSizing: 'border-box',
                   }}
                 />
               </div>
 
               <button
+                id="login-submit-btn"
                 type="submit"
                 disabled={submitting}
                 style={{
                   width: '100%',
-                  padding: '12px',
+                  padding: '10px',
+                  fontSize: '15px',
+                  fontWeight: 600,
                   borderRadius: '6px',
                   border: 'none',
                   background: 'var(--accent)',
                   color: '#fff',
-                  fontSize: '15px',
-                  fontWeight: 600,
                   cursor: submitting ? 'not-allowed' : 'pointer',
-                  transition: 'opacity 0.2s ease',
                   opacity: submitting ? 0.7 : 1,
+                  transition: 'opacity 0.2s',
                 }}
               >
                 {submitting ? 'Authenticating...' : 'Sign In'}
               </button>
             </form>
 
-            <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' }}>
-                Development Quick-Fill Credentials:
-              </div>
+            <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+              <p style={{ fontSize: '13px', color: 'var(--text)', margin: '0 0 10px 0', fontWeight: 500 }}>
+                Demo Credentials (Quick-Fill):
+              </p>
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <button
                   type="button"
+                  id="quickfill-owner-btn"
                   onClick={() => handleQuickFill('owner@slotify.dev', 'DevPassword123!')}
                   style={{
                     padding: '6px 12px',
                     fontSize: '12px',
-                    borderRadius: '4px',
+                    borderRadius: '6px',
                     border: '1px solid var(--border)',
                     background: 'var(--bg)',
                     color: 'var(--text)',
                     cursor: 'pointer',
                   }}
                 >
-                  System Owner Demo
+                  System Owner
                 </button>
                 <button
                   type="button"
+                  id="quickfill-admin-a-btn"
                   onClick={() => handleQuickFill('admin@urbanwellness.slotify.dev', 'DevPassword123!')}
                   style={{
                     padding: '6px 12px',
                     fontSize: '12px',
-                    borderRadius: '4px',
+                    borderRadius: '6px',
                     border: '1px solid var(--border)',
                     background: 'var(--bg)',
                     color: 'var(--text)',
                     cursor: 'pointer',
                   }}
                 >
-                  Urban Wellness (Tenant A)
+                  Admin A (Urban Wellness)
                 </button>
                 <button
                   type="button"
+                  id="quickfill-admin-b-btn"
                   onClick={() => handleQuickFill('admin@techfix.slotify.dev', 'DevPassword123!')}
                   style={{
                     padding: '6px 12px',
                     fontSize: '12px',
-                    borderRadius: '4px',
+                    borderRadius: '6px',
                     border: '1px solid var(--border)',
                     background: 'var(--bg)',
                     color: 'var(--text)',
                     cursor: 'pointer',
                   }}
                 >
-                  TechFix (Tenant B)
+                  Admin B (TechFix)
                 </button>
               </div>
             </div>
@@ -323,18 +475,18 @@ function App() {
         )}
       </section>
 
-      {/* Backend API Health Status Card (Preserved from Phase 0) */}
+      {/* Backend Health Connection Banner */}
       <section style={{
-        background: 'var(--bg)',
+        background: 'var(--code-bg)',
         border: '1px solid var(--border)',
         borderRadius: '12px',
-        padding: '24px',
+        padding: '20px',
         textAlign: 'left',
-        marginBottom: '28px'
+        boxShadow: 'var(--shadow)',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--text-h)' }}>
-            System Health Monitoring
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text-h)' }}>
+            System Connectivity Status
           </h3>
           <button
             type="button"

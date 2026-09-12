@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Shield,
   Activity,
+  CalendarCheck,
 } from 'lucide-react';
 import Header from '../components/Header.jsx';
 import OnboardBusinessModal from '../components/OnboardBusinessModal.jsx';
@@ -19,9 +20,11 @@ import {
   getPlatformBusinesses,
   updateBusinessStatus,
 } from '../services/business.service.js';
+import { getPlatformAnalytics } from '../services/analytics.service.js';
 
 export default function SystemOwnerDashboard({ user, onLogout }) {
   const [businesses, setBusinesses] = useState([]);
+  const [platformAppointments, setPlatformAppointments] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,8 +47,18 @@ export default function SystemOwnerDashboard({ user, onLogout }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await getPlatformBusinesses();
-      setBusinesses(data.data?.businesses || []);
+      const [dataRes, pfRes] = await Promise.allSettled([
+        getPlatformBusinesses(),
+        getPlatformAnalytics(),
+      ]);
+      if (dataRes.status === 'fulfilled') {
+        setBusinesses(dataRes.value.data?.businesses || []);
+      } else {
+        throw dataRes.reason;
+      }
+      if (pfRes.status === 'fulfilled' && pfRes.value?.data) {
+        setPlatformAppointments(pfRes.value.data.totalAppointments || 0);
+      }
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch businesses');
     } finally {
@@ -252,6 +265,21 @@ export default function SystemOwnerDashboard({ user, onLogout }) {
               </div>
               <div style={{ fontSize: '30px', fontWeight: 800, color: stats.disabled > 0 ? '#dc2626' : 'var(--text)', marginTop: '6px' }}>
                 {stats.disabled}
+              </div>
+            </div>
+
+            <div style={{
+              background: 'var(--code-bg)',
+              border: '1px solid var(--border)',
+              borderRadius: '10px',
+              padding: '16px 20px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text)', fontSize: '13px', fontWeight: 600 }}>
+                <span>PLATFORM BOOKINGS</span>
+                <CalendarCheck size={18} color="#eab308" />
+              </div>
+              <div style={{ fontSize: '30px', fontWeight: 800, color: '#eab308', marginTop: '6px' }}>
+                {platformAppointments}
               </div>
             </div>
           </div>

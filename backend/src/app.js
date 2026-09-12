@@ -14,10 +14,14 @@ const app = express();
 // Security HTTP headers
 app.use(helmet());
 
-// CORS configuration (configured for credentials and client origin)
+// CORS configuration (configured for credentials and whitelisted client origins)
+const clientOrigins = env.CLIENT_URL.includes(',')
+  ? env.CLIENT_URL.split(',').map((url) => url.trim())
+  : env.CLIENT_URL;
+
 app.use(
   cors({
-    origin: env.CLIENT_URL,
+    origin: clientOrigins,
     credentials: true,
   })
 );
