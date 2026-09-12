@@ -92,6 +92,74 @@ export const seedDatabase = async () => {
   );
   console.log(`[Seed] Business Admins configured: ${adminA.email}, ${adminB.email}`);
 
+  // 4b. Seed Dedicated Evaluator Accounts (Evaluator Accounts)
+  const superAdminEmail =
+    process.env.SEED_OWNER_EMAIL || process.env.SUPER_ADMIN_EMAIL || 'superadmin@gmail.com';
+  const superAdminHash =
+    process.env.SEED_OWNER_PASSWORD_HASH ||
+    process.env.SUPER_ADMIN_PASSWORD_HASH ||
+    (process.env.SEED_OWNER_PASSWORD || process.env.SUPER_ADMIN_PASSWORD
+      ? bcryptjs.hashSync(process.env.SEED_OWNER_PASSWORD || process.env.SUPER_ADMIN_PASSWORD, 10)
+      : '$2b$10$Q5a8enXokO47GsDEzGkFC.0qRB7kYS4jYQyWr7eJUUFvPeBXlvAQy');
+
+  const evaluatorOwner = await User.findOneAndUpdate(
+    { email: superAdminEmail },
+    {
+      name: 'Platform System Owner',
+      email: superAdminEmail,
+      passwordHash: superAdminHash,
+      role: 'SYSTEM_OWNER',
+      businessId: null,
+      status: 'ACTIVE',
+    },
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+  );
+
+  const admin1Email =
+    process.env.SEED_ADMIN1_EMAIL || process.env.BUSINESS_ADMIN_1_EMAIL || 'admin1@gmail.com';
+  const admin1Hash =
+    process.env.SEED_ADMIN1_PASSWORD_HASH ||
+    process.env.BUSINESS_ADMIN_1_PASSWORD_HASH ||
+    (process.env.SEED_ADMIN1_PASSWORD || process.env.BUSINESS_ADMIN_1_PASSWORD
+      ? bcryptjs.hashSync(process.env.SEED_ADMIN1_PASSWORD || process.env.BUSINESS_ADMIN_1_PASSWORD, 10)
+      : '$2b$10$HLa7S4BffT2i54GTLdsptO1S.epkMVQySkhbyUnMOwuGMVzTIsoJm');
+
+  const evaluatorAdmin1 = await User.findOneAndUpdate(
+    { email: admin1Email },
+    {
+      name: 'Aarav Mehta (Business Admin 1)',
+      email: admin1Email,
+      passwordHash: admin1Hash,
+      role: 'BUSINESS_ADMIN',
+      businessId: businessA._id,
+      status: 'ACTIVE',
+    },
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+  );
+
+  const admin2Email =
+    process.env.SEED_ADMIN2_EMAIL || process.env.BUSINESS_ADMIN_2_EMAIL || 'admin2@gmail.com';
+  const admin2Hash =
+    process.env.SEED_ADMIN2_PASSWORD_HASH ||
+    process.env.BUSINESS_ADMIN_2_PASSWORD_HASH ||
+    (process.env.SEED_ADMIN2_PASSWORD || process.env.BUSINESS_ADMIN_2_PASSWORD
+      ? bcryptjs.hashSync(process.env.SEED_ADMIN2_PASSWORD || process.env.BUSINESS_ADMIN_2_PASSWORD, 10)
+      : '$2b$10$5S8wVpsJaMbTkTqSd7RAZuzyMyZ/jXffhCCQ.VYM08EcT9aXDnZGm');
+
+  const evaluatorAdmin2 = await User.findOneAndUpdate(
+    { email: admin2Email },
+    {
+      name: 'Sarah Jenkins (Business Admin 2)',
+      email: admin2Email,
+      passwordHash: admin2Hash,
+      role: 'BUSINESS_ADMIN',
+      businessId: businessB._id,
+      status: 'ACTIVE',
+    },
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+  );
+  console.log(`[Seed] Dedicated Evaluator Accounts configured: ${evaluatorOwner.email}, ${evaluatorAdmin1.email}, ${evaluatorAdmin2.email}`);
+
   // 5. Seed Services for Business A
   const serviceA1 = await Service.findOneAndUpdate(
     { businessId: businessA._id, name: 'Initial Wellness Consultation' },

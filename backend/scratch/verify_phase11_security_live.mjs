@@ -245,9 +245,10 @@ const runSecurityLiveAudit = async () => {
   );
 
   // 10. Public Booking Validation & Race Condition Concurrency
-  console.log('\n--- 6. Public Booking & Concurrency Protection ---');
   const urbanBizInfo = await api('/public/businesses/urban-wellness-studio');
-  const firstService = urbanBizInfo.data?.data?.services?.[0];
+  const firstService =
+    urbanBizInfo.data?.data?.services?.find((s) => s.name === 'Initial Wellness Consultation') ||
+    urbanBizInfo.data?.data?.services?.[0];
   const serviceId = firstService?._id;
 
   // Query available slots

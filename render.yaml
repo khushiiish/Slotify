@@ -1,9 +1,8 @@
 services:
   - type: web
-    name: slotify-api
+    name: slotify
     runtime: node
-    rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm run build
     startCommand: npm start
     plan: free
     healthCheckPath: /api/health
@@ -16,7 +15,10 @@ services:
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 1d
-      - key: CLIENT_URL
-        sync: false
       - key: COOKIE_NAME
         value: slotify_token
+      - key: CLIENT_URL
+        sync: false
+      - key: VITE_API_URL
+        value: /api
+

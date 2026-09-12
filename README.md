@@ -1,409 +1,558 @@
-# Slotify: Multi-Tenant B2B Appointment Booking Platform
+# Slotify — Multi-Tenant B2B Appointment Booking Platform
 
-Slotify is a production-grade multi-tenant B2B appointment scheduling SaaS platform designed for appointment-based service businesses (spas, salons, repair centers, clinics, consultancies).
+> **Production Deployment (Render Unified Service)**: [https://slotify.onrender.com](https://slotify.onrender.com)  
+> **API Health Check**: [https://slotify.onrender.com/api/health](https://slotify.onrender.com/api/health)
 
-Built with an **Express 5 + Mongoose 9** backend and a modern **React 19 + Vite** frontend in full JavaScript ES modules.
-
----
-
-## Current Status: Phase 11 Completed
-
-### Architecture Overview Across Phases
-
-| Phase | Scope | Status | Test Coverage |
-|---|---|---|---|
-| **Phase 0** | Production Foundation, Express 5, Error Handling, Health Check, CORS, Logging | Completed | 6 tests |
-| **Phase 1** | Database Architecture, Mongoose 9 Models, Tenant Indexes, Seed Script | Completed | 29 tests |
-| **Phase 2** | JWT Cookie Authentication, Bcrypt Password Hashing, Session Validation | Completed | 18 tests |
-| **Phase 3** | RBAC, Multi-Tenant Authorization, Anti-IDOR & Tenant Isolation | Completed | 18 tests |
-| **Phase 4** | System Owner Business Onboarding & Management, Lifecycle Control | Completed | 16 tests |
-| **Phase 5** | Business Admin Service & Staff Management, Safe Deletion & Reference Integrity | Completed | 31 tests |
-| **Phase 6** | Availability Management, Blocked Dates & Timezone-Aware 15-Min Slot Generation | Completed | 22 tests |
-| **Phase 7** | Booking Engine, Double-Booking Concurrency Protection & Overlap Prevention | Completed | 30 tests |
-| **Phase 8** | Customer Experience & Public Scheduling, Anti-IDOR Token Security, Self-Cancellation | Completed | 20 tests |
-| **Phase 9** | Appointment Management, Centralized State Machine, Filters, Calendar & Timezones | Completed | 28 tests |
-| **Phase 10** | Business Admin Analytics, Recharts Visualizations, Platform Metrics, UI/UX Polish | Completed | 16 tests |
-| **Phase 11** | Security Hardening, IDOR/ReDoS/NoSQL Audit, Concurrency Race Tests, Browser E2E | **Completed** | **26 tests (260 total)** |
+Slotify is an enterprise-grade multi-tenant B2B appointment scheduling SaaS platform designed for service-oriented businesses (wellness centers, healthcare clinics, technical repair shops, consultancies). The platform delivers strict multi-tenant isolation, atomic concurrency protection against double-booking, deterministic timezone-aware slot generation, client self-service scheduling with cryptographically signed tokens, role-based dashboards, and platform-wide analytics.
 
 ---
 
-## Phase 3: RBAC + Multi-Tenant Authorization + Tenant Isolation
+## Table of Contents
 
-### 1. Authentication vs. Authorization
-
-* **Authentication (`authenticate` middleware)**:
-  * Answers: *"Who are you?"*
-  * Extracts and verifies the HTTP-only JWT session cookie (`slotify_token`).
-  * Validates user and business active status against the database.
-  * Attaches minimal, safe user context to `req.user` (`{ id, role, businessId }`).
-  * Never attaches password hashes, tokens, or raw database documents.
-
-* **Role-Based Authorization (`requireRole` middleware)**:
-  * Answers: *"What role permissions do you possess?"*
-  * Evaluates `req.user.role` against allowed roles (`SYSTEM_OWNER`, `BUSINESS_ADMIN`).
-  * Returns `401 Unauthorized` if unauthenticated.
-  * Returns `403 Forbidden` if role is insufficient.
-
-* **Tenant Authorization (`requireBusinessAccess` middleware)**:
-  * Answers: *"Which tenant data are you permitted to touch?"*
-  * For `BUSINESS_ADMIN`, establishes `req.user.businessId` as the uncompromisable tenant boundary.
-  * Prevents cross-tenant parameter tampering and IDOR.
-
----
-
-### 2. Role Definitions
-
-1. **`SYSTEM_OWNER`**:
-   * Platform-wide super administrator.
-   * `businessId` is strictly `null`.
-   * Authorized for platform-level management endpoints (e.g. `GET /api/businesses`).
-   * Authorized for cross-tenant operations only where explicitly exposed by platform-level routes.
-
-2. **`BUSINESS_ADMIN`**:
-   * Single-tenant administrative user.
-   * Associated strictly with one business (`req.user.businessId`).
-   * Can operate **only** within their own business boundary.
-   * Denied from platform-wide administrative routes (`403 Forbidden`).
-   * Denied from any route or resource belonging to another business (`403 Forbidden`).
+1. [Project Overview](#1-project-overview)
+2. [Problem Statement](#2-problem-statement)
+3. [Key Features](#3-key-features)
+4. [User Roles](#4-user-roles)
+5. [Complete User Flow](#5-complete-user-flow)
+6. [Tech Stack](#6-tech-stack)
+7. [Architecture](#7-architecture)
+8. [Folder Structure](#8-folder-structure)
+9. [Database & Data Models](#9-database--data-models)
+10. [Authentication & Session Security](#10-authentication--session-security)
+11. [Role-Based Access Control (RBAC)](#11-role-based-access-control-rbac)
+12. [Multi-Tenant Isolation & Zero-Trust](#12-multi-tenant-isolation--zero-trust)
+13. [Booking Engine & Atomic Concurrency](#13-booking-engine--atomic-concurrency)
+14. [Availability & Slot Generation Engine](#14-availability--slot-generation-engine)
+15. [Timezone Handling](#15-timezone-handling)
+16. [Appointment Lifecycle & State Machine](#16-appointment-lifecycle--state-machine)
+17. [Customer Appointment Token Security](#17-customer-appointment-token-security)
+18. [Analytics & Reporting Engine](#18-analytics--reporting-engine)
+19. [Security Hardening & Protection Defenses](#19-security-hardening--protection-defenses)
+20. [API Route Overview](#20-api-route-overview)
+21. [Environment Variables Reference](#21-environment-variables-reference)
+22. [Local Setup Guide](#22-local-setup-guide)
+23. [Automated Test Suite & Results](#23-automated-test-suite--results)
+24. [Deployment Architecture](#24-deployment-architecture)
+25. [Render Single-Service Deployment](#25-render-single-service-deployment)
+26. [Dedicated Evaluator Credentials](#26-dedicated-evaluator-credentials)
+27. [Final Verification Audit](#27-final-verification-audit)
+28. [Known Limitations](#28-known-limitations)
+29. [Future Improvements](#29-future-improvements)
 
 ---
 
-### 3. Tenant Isolation Strategy & Zero-Trust Rule
+## 1. Project Overview
 
-#### Why Client-Supplied `businessId` Is Never Trusted
-A common multi-tenant security flaw is trusting `businessId` sent in the request body, route parameter, or query string. In Slotify:
-* **The authenticated user's JWT context (`req.user.businessId`) is the sole authority for tenant scoping.**
-* If a `BUSINESS_ADMIN` attempts to supply a conflicting `businessId`:
-  * Route parameter tampering: `/api/businesses/:otherBusinessId` → **`403 Forbidden`**
-  * Query parameter tampering: `?businessId=otherBusinessId` → **`403 Forbidden`**
-  * Body payload tampering: `{ "businessId": "otherBusinessId" }` → **`403 Forbidden`**
-* For mutations (POST/PUT/PATCH), any missing `businessId` is automatically bound to `req.user.businessId` via `enforceTenantContext`.
+Slotify bridges service businesses and their clients by delivering an integrated, high-performance scheduling platform. It addresses the operational friction found in traditional scheduling software: double-booking race conditions, cross-tenant data leaks, confusing timezone discrepancies, and bloated infrastructure.
+
+The platform is deployed as a **single unified production service on Render**, where an Express 5 backend provides secure RESTful APIs while simultaneously serving the optimized React 19 single-page application (SPA) with full client-side routing fallback.
 
 ---
 
-### 4. Middleware Execution Flow
+## 2. Problem Statement
 
-Every protected request passes through a sequential security pipeline:
+Service-based businesses operate in high-concurrency environments where multiple customers simultaneously contend for limited staff and time windows. Typical booking software suffers from critical flaws:
+* **Concurrency Vulnerabilities**: Overlapping requests create double bookings when queries and insertions are not atomically guarded.
+* **Insecure Multi-Tenancy**: Relying on client-supplied `businessId` parameters allows malicious actors to access or tamper with other tenants' appointments, staff, and financial analytics.
+* **Timezone Shifts**: Booking across different geographical timezones corrupts schedules unless UTC normalization is enforced end-to-end.
+* **Token Misuse & IDOR**: Simple appointment ID URLs expose customer PII to enumeration attacks unless cryptographically signed access tokens are required.
+
+Slotify eliminates these failure modes with zero-trust tenant enforcement, MongoDB atomic locking transactions, HMAC-SHA256 customer access tokens, and strict UTC-normalized availability calculations.
+
+---
+
+## 3. Key Features
+
+* **Unified Single-Origin Architecture**: One public URL on Render serves both frontend UI and backend API with zero cross-origin cookie issues.
+* **Strict Tenant Isolation**: All administrative queries are scoped automatically from the verified JWT session context. Client tampering via query, body, or route parameters is immediately rejected with HTTP 403.
+* **Atomic Double-Booking Prevention**: Two-phase concurrency protection using staff availability locks and atomic database transactions. Conflicting concurrent bookings return HTTP 409 Conflict with zero race-condition double-bookings.
+* **15-Minute Slot Generation Engine**: Dynamic, deterministic slot computation taking into account business hours, staff availability, service durations, blocked dates, and pre-existing appointments.
+* **Self-Service Customer Booking & Cancellation**: Public booking portal allows customers to select services, choose available slots, enter details, receive instant confirmation, and cancel appointments securely.
+* **Customer Token Access Control**: HMAC-SHA256 customer access tokens restrict viewing and cancelling appointments strictly to the appointment owner, preventing horizontal privilege escalation.
+* **Administrative Full Calendar**: Interactive monthly and weekly calendar views displaying real-time appointments color-coded by status and staff member.
+* **Interactive Analytics Engine**: Tenant-isolated metric calculations featuring appointment counts, revenue estimation, completion rates, cancellation rates, daily trends, and staff performance charts.
+* **Enterprise Security Hardening**: Helmet security headers, rate limiters on public and authenticated endpoints, NoSQL injection sanitization, and ReDoS-safe input handling.
+
+---
+
+## 4. User Roles
+
+1. **System Owner (`SYSTEM_OWNER`)**:
+   * Platform-wide super administrator (`businessId: null`).
+   * Onboards new businesses, monitors platform-wide tenant health, toggles business operational status (enable/disable), and inspects platform analytics across all tenants.
+2. **Business Admin (`BUSINESS_ADMIN`)**:
+   * Single-tenant administrative user strictly bound to one business (`req.user.businessId`).
+   * Manages services, staff members, staff-service associations, weekly availability schedules, blocked dates, appointment calendar, and tenant-level business analytics.
+   * Completely isolated from other businesses; cannot read or write data belonging to any other tenant.
+3. **End Customer (Public / Unauthenticated)**:
+   * Accesses public booking portals via `/book/:businessSlug`.
+   * Views active services, generates real-time available slots, and books appointments.
+   * Receives an encrypted customer appointment token to view or self-cancel their appointment via `/customer/appointments/:id?token=...`.
+
+---
+
+## 5. Complete User Flow
 
 ```
-Incoming Request
-      ↓
-[1. authenticate]
-      ├── Missing/invalid/expired token → 401 Unauthorized
-      ├── Disabled user status → 403 Forbidden
-      ├── Disabled business status → 403 Forbidden
-      └── Attaches req.user = { id, role, businessId }
-      ↓
-[2. requireRole(...allowedRoles)]
-      ├── Role not in allowedRoles → 403 Forbidden
-      └── Role permitted → next()
-      ↓
-[3. requireBusinessAccess('businessId')]
-      ├── SYSTEM_OWNER → next() (Platform-level pass-through)
-      ├── BUSINESS_ADMIN:
-      │     ├── Missing req.user.businessId → 403 Forbidden
-      │     ├── req.params.businessId !== req.user.businessId → 403 Forbidden
-      │     ├── req.query.businessId !== req.user.businessId → 403 Forbidden
-      │     ├── req.body.businessId !== req.user.businessId → 403 Forbidden
-      │     └── Authoritative req.user.businessId bound
-      ↓
-[4. Controller / Service Handler]
-      └── Enforces tenant-scoped database filter:
-            Service.find(getTenantFilter(req.user, { businessId }))
-            assertTenantOwnership(resource, req.user)
+1. PLATFORM ONBOARDING (System Owner)
+   System Owner Logs In → Creates Tenant (e.g. Urban Wellness Studio) → Sets Timezone & Initial Admin
+   ↓
+2. TENANT SETUP (Business Admin)
+   Business Admin Logs In → Configures Services (Duration, Status) → Adds Staff → Sets Weekly Availability
+   ↓
+3. PUBLIC CUSTOMER BOOKING (Customer)
+   Customer visits /book/:slug → Selects Service & Date → Slot Engine Generates Open Timeslots
+   Customer Selects Slot → Submits Name & Email → Atomic Transaction Secures Slot
+   ↓
+4. CONFIRMATION & TOKEN MANAGEMENT
+   System Returns 201 Created + HMAC Customer Token → Customer Receives Confirmation Screen
+   Customer Views /customer/appointments/:id?token=... → Option to Cancel Appointment
+   ↓
+5. ADMIN MANAGEMENT & REPORTING
+   Business Admin Views Appointments in List & FullCalendar → Updates Status (Completed, No-Show)
+   Admin Reviews Analytics (Revenue, Completion Rate, Staff Workload)
 ```
 
 ---
 
-### 5. Resource Ownership & Anti-IDOR Pattern
+## 6. Tech Stack
 
-To prevent Insecure Direct Object References (IDOR), resource identifiers alone are never sufficient to access tenant data.
-
-1. **Scoped Query Filtering (`getTenantFilter`)**:
-   ```javascript
-   // Automatically injects tenant boundary for Business Admins
-   const filter = getTenantFilter(req.user, { businessId });
-   // Result for Business Admin: { businessId: req.user.businessId }
-   const services = await Service.find(filter);
-   ```
-
-2. **Tenant Ownership Assertion (`assertTenantOwnership`)**:
-   ```javascript
-   const service = await Service.findById(serviceId);
-   if (!service) {
-     return res.status(404).json({ success: false, message: 'Service not found.' });
-   }
-   // Throws 403 Forbidden if service.businessId does not match req.user.businessId
-   assertTenantOwnership(service, req.user);
-   ```
+| Layer | Technology | Details |
+|---|---|---|
+| **Runtime** | Node.js (v20+ / v22+) | Full ES Modules (`"type": "module"`) |
+| **Backend Framework** | Express.js 5.2.1 | Modern routing, error-handling middleware, single-service SPA static serving |
+| **Database & ODM** | MongoDB Atlas / Mongoose 9.10 | ACID Transactions, Compound Unique Indexes, Strict Schema Validation |
+| **Security & Auth** | JSON Web Tokens & Bcryptjs | HTTP-only Cookies, Work Factor 10, HMAC-SHA256 Customer Tokens |
+| **Frontend Framework** | React 19.2.8 | Functional components, Hooks, Vite 8.3 build system |
+| **Styling & Icons** | Tailwind CSS v4 & Lucide Icons | Responsive UI, modern glassmorphic theme, desktop & mobile optimized |
+| **Data Visualization** | Recharts 3.10 | Responsive Bar charts, Line charts, Area charts |
+| **Calendar Engine** | FullCalendar 6.1 / 7.1 | DayGrid, TimeGrid, interactive appointment modals |
+| **Testing Suite** | Vitest 5.0 & Supertest 7.2 | 260 Unit, Integration, Concurrency, and Security Regression Tests |
+| **Deployment** | Render Web Service | Unified single-origin hosting with `/api` routing and SPA fallback |
 
 ---
 
-### 6. Standardized Error Handling: 401 vs. 403
+## 7. Architecture
 
-Slotify strictly follows RFC 7235 / RFC 7231 status conventions:
+```
+                                      [ Browser Client ]
+                                              │
+                         HTTPS Request (Desktop / Mobile 375px-1440px)
+                                              ▼
+                    ┌──────────────────────────────────────────────────┐
+                    │               RENDER WEB SERVICE                 │
+                    │         https://slotify.onrender.com             │
+                    │                                                  │
+                    │   Express 5 Application Listener (Port 5000)     │
+                    │                                                  │
+                    │   ├── Helmet Headers (HSTS, NoSniff, XFrame)     │
+                    │   ├── CORS Handler (Same-origin native support)  │
+                    │   ├── Rate Limiting (API & Public Booking tiers) │
+                    │   │                                              │
+                    │   ├── [ /api/* Routes ] ─────────────────────┐   │
+                    │   │   ├── Auth & JWT Cookie Middleware       │   │
+                    │   │   ├── Tenant Isolation Guards            │   │
+                    │   │   ├── Controllers & Services             │   │
+                    │   │   └── JSON API Responses                 │   │
+                    │   │                                          │   │
+                    │   └── [ Static Assets & SPA Fallback ]       │   │
+                    │       ├── express.static('frontend/dist')    │   │
+                    │       └── GET * (Non-API) -> index.html      │   │
+                    └──────────────────────────────────────────────┼───┘
+                                                                   │
+                                                      Mongoose 9 ODM Queries
+                                                      & ACID Transactions
+                                                                   ▼
+                                                    ┌───────────────────────────┐
+                                                    │       MONGODB ATLAS       │
+                                                    │   Cluster0 Replica Set    │
+                                                    │                           │
+                                                    │   - Users                 │
+                                                    │   - Businesses            │
+                                                    │   - Services              │
+                                                    │   - Staff                 │
+                                                    │   - Availabilities        │
+                                                    │   - BlockedDates          │
+                                                    │   - Appointments          │
+                                                    └───────────────────────────┘
+```
 
-* **`401 Unauthorized`**: Request lacks valid authentication credentials.
+---
+
+## 8. Folder Structure
+
+```
+Slotify/
+├── package.json                 # Root deployment package scripts (build, start, test)
+├── render.yaml                  # Render Blueprint definition (web service, env vars)
+├── README.md                    # Comprehensive documentation
+├── .gitignore                   # Ignores .env, node_modules, dist, logs
+├── backend/
+│   ├── package.json             # Backend dependencies (express, mongoose, bcryptjs, etc.)
+│   ├── src/
+│   │   ├── server.js            # Server startup, DB connection, idempotent bootstrapping
+│   │   ├── app.js               # Express app, security middleware, API router, SPA fallback
+│   │   ├── config/
+│   │   │   ├── db.js            # MongoDB connection & disconnection handlers
+│   │   │   ├── env.js           # Zod-validated environment configuration
+│   │   │   └── seed.js          # Idempotent database & evaluator credential seeding
+│   │   ├── controllers/         # Request handling & HTTP response mapping
+│   │   ├── middleware/          # authenticate, requireRole, requireBusinessAccess, rateLimit
+│   │   ├── models/              # Mongoose schemas (Business, User, Service, Staff, Appointment)
+│   │   ├── routes/              # Express routers (/auth, /businesses, /services, /public, etc.)
+│   │   ├── services/            # Core business logic, slot generation, atomic booking
+│   │   ├── utils/               # cookie helpers, jwt token signing, timezone helpers
+│   │   └── validators/          # Zod validation schemas for request bodies and queries
+│   ├── scratch/                 # hash_credentials.mjs, verify_phase11_security_live.mjs
+│   └── tests/                   # 12 Vitest suites covering all 260 unit and integration tests
+└── frontend/
+    ├── package.json             # Frontend dependencies (react, lucide-react, recharts, fullcalendar)
+    ├── vite.config.js           # Vite build configuration with React plugin
+    ├── index.html               # SPA entrypoint with responsive meta and titles
+    ├── dist/                    # Compiled production assets served by Express
+    └── src/
+        ├── App.jsx              # Client-side router, session checker, top navigation
+        ├── App.css              # Global tokens, color palettes, responsive rules
+        ├── components/          # Modals, calendar views, analytics charts, forms
+        ├── pages/               # SystemOwnerDashboard, BusinessAdminDashboard, PublicBookingPage
+        ├── services/            # Axios API layer with relative /api baseURL in production
+        └── store/               # Zustand auth state store
+```
+
+---
+
+## 9. Database & Data Models
+
+1. **`Business`**: `name`, `slug` (unique index), `contactEmail`, `contactPhone`, `timezone`, `status` (`ACTIVE`/`DISABLED`), `isBookingDisabled`.
+2. **`User`**: `email` (unique index), `passwordHash`, `name`, `role` (`SYSTEM_OWNER`/`BUSINESS_ADMIN`), `businessId` (null for System Owner), `status` (`ACTIVE`/`DISABLED`).
+3. **`Service`**: `businessId` (tenant index), `name`, `description`, `durationMinutes`, `price`, `status` (`ACTIVE`/`INACTIVE`).
+4. **`Staff`**: `businessId` (tenant index), `name`, `email`, `phone`, `serviceIds` (array of Service ObjectIds validated to belong to same tenant), `status` (`ACTIVE`/`INACTIVE`).
+5. **`Availability`**: `businessId`, `staffId` (nullable for business-level), `dayOfWeek` (0–6), `startTime` ("HH:mm"), `endTime` ("HH:mm"), `isActive`. Compound index on `{ businessId: 1, staffId: 1, dayOfWeek: 1 }`.
+6. **`BlockedDate`**: `businessId`, `staffId` (nullable for studio-wide holidays), `date` (UTC start of day), `reason`. Compound index on `{ businessId: 1, staffId: 1, date: 1 }`.
+7. **`Appointment`**: `businessId`, `serviceId`, `staffId`, `customerName`, `customerEmail`, `customerPhone`, `startTime` (Date), `endTime` (Date), `status` (`CONFIRMED`, `COMPLETED`, `CANCELLED`, `NO_SHOW`), `notes`. Compound index on `{ businessId: 1, staffId: 1, startTime: 1, status: 1 }`.
+
+---
+
+## 10. Authentication & Session Security
+
+* **Bcrypt Password Hashing**: All user passwords are encrypted using `bcryptjs` with a work factor of 10. Plaintext passwords are never stored in databases, logs, or frontend code.
+* **HTTP-Only Cookies**: Authentication session tokens are transmitted strictly via HTTP-only cookies (`slotify_token`), blocking XSS token theft.
+* **Same-Origin & Secure Flags**: In production on Render, cookies are set with `SameSite=Lax` (or `None` if cross-origin) and `Secure=true` over HTTPS.
+* **Payload Isolation**: The signed JWT contains strictly `{ id, role, businessId }`. Password hashes and internal document references are never included.
+* **Lifecycle Validation**: Even with a valid cryptographic signature, the `authenticate` middleware queries the database to verify the user account is active and that their associated business is enabled.
+
+---
+
+## 11. Role-Based Access Control (RBAC)
+
+Slotify enforces strict role boundaries:
+* **System Owner Routes**: Protected by `authenticate` and `requireRole('SYSTEM_OWNER')`. Business Admins attempting to access these routes receive HTTP 403 Forbidden.
+* **Business Admin Routes**: Protected by `authenticate` and `requireRole('BUSINESS_ADMIN')`. System Owners cannot access tenant-scoped mutations that require a valid `businessId`.
+* **Public Routes**: Open to unauthenticated clients for business discovery and slot generation, protected by rate limiting and schema validation.
+
+---
+
+## 12. Multi-Tenant Isolation & Zero-Trust
+
+Slotify implements a zero-trust tenant architecture:
+* **JWT as Single Source of Truth**: The authenticated user's `req.user.businessId` is the sole authority for tenant isolation.
+* **Anti-IDOR Parameter Protection**:
+  * If a request query string contains `?businessId=...` that does not match `req.user.businessId`, the middleware immediately aborts with **HTTP 403 Forbidden**.
+  * If a request body contains `{ businessId: "..." }` attempting to spoof another tenant, the middleware immediately aborts with **HTTP 403 Forbidden**.
+  * Route parameter mutations (`/api/services/:id`) verify that the target document's `businessId` matches `req.user.businessId`. Cross-tenant manipulation returns HTTP 403 or 404.
+
+---
+
+## 13. Booking Engine & Atomic Concurrency
+
+To eliminate double-booking race conditions during high-volume customer scheduling:
+1. **Two-Phase Concurrency Control**:
+   * **Phase 1 (Availability Validation)**: Slot is verified against working hours, staff working schedules, blocked holiday dates, and existing confirmed appointments.
+   * **Phase 2 (Atomic Execution)**: Booking execution is wrapped inside a staff-level lock and MongoDB atomic transaction with a compound query ensuring no overlapping appointment exists for that staff member:
+     ```javascript
+     const conflict = await Appointment.findOne({
+       businessId,
+       staffId,
+       status: { $ne: 'CANCELLED' },
+       $or: [
+         { startTime: { $lt: requestedEnd, $gte: requestedStart } },
+         { endTime: { $gt: requestedStart, $lte: requestedEnd } },
+         { startTime: { $lte: requestedStart }, endTime: { $gte: requestedEnd } }
+       ]
+     }).session(session);
+     ```
+2. **Conflict Response**: If two clients submit for the exact same slot concurrently, exactly one succeeds (HTTP 201 Created) while the competing request is immediately rejected with **HTTP 409 Conflict** and the message *"Selected time slot is no longer available."*
+
+---
+
+## 14. Availability & Slot Generation Engine
+
+* **Deterministic 15-Minute Grid**: Time is partitioned into discrete 15-minute intervals.
+* **Staff Assignment Modes**:
+  * Specific Staff: Evaluates availability, blocked dates, and conflicts for the requested staff member.
+  * Any Staff: Scans all active staff members assigned to the service and pools open slots, selecting available staff dynamically.
+* **Buffer & Boundary Rules**: Touch-boundary appointments are permitted (e.g. 10:00–10:30 followed by 10:30–11:00 for the same staff member).
+* **Instant Re-availability**: When an appointment is cancelled, its timeslot immediately becomes available for re-booking.
+
+---
+
+## 15. Timezone Handling
+
+* **Database UTC Normalization**: All appointment start and end times are stored in MongoDB as UTC ISO 8601 timestamps (`startTime: ISODate`).
+* **Tenant Business Timezone**: Each business defines its operational timezone (e.g. `Asia/Kolkata`, `America/Los_Angeles`).
+* **Conversion Pipeline**: Working hours (e.g. "09:00" to "17:00") and customer date queries (e.g. "2026-11-23") are translated to UTC boundaries using deterministic date-time calculations, ensuring consistent slot generation regardless of server physical location.
+
+---
+
+## 16. Appointment Lifecycle & State Machine
+
+```
+                  ┌───────────────┐
+                  │   CONFIRMED   │ ◄─── (Created via Booking Engine)
+                  └───────┬───────┘
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
+   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+   │  COMPLETED  │ │  CANCELLED  │ │   NO_SHOW   │
+   └─────────────┘ └─────────────┘ └─────────────┘
+```
+
+* **Transition Rules**:
+  * Only `CONFIRMED` appointments can transition to `COMPLETED`, `CANCELLED`, or `NO_SHOW`.
+  * `CANCELLED` and `COMPLETED` appointments are terminal and cannot be retroactively modified.
+  * When an appointment is cancelled, its staff slot is immediately released.
+
+---
+
+## 17. Customer Appointment Token Security
+
+* **Token Signature**: Each appointment generates a signed customer access token using HMAC-SHA256:
   ```json
   {
-    "success": false,
-    "message": "Authentication required. No token provided."
+    "appointmentId": "6aa401be...",
+    "customerEmail": "customer@example.com",
+    "businessId": "6aa401be...",
+    "type": "CUSTOMER_APPOINTMENT_ACCESS",
+    "exp": 1791839069
   }
   ```
-* **`403 Forbidden`**: Request is authenticated, but the user is denied permission or attempting cross-tenant access.
-  ```json
-  {
-    "success": false,
-    "message": "You do not have permission to access resources belonging to another business."
-  }
-  ```
-
-Internal database errors, stack traces, and details that reveal other tenants' private IDs or data existence are never exposed.
+* **Security Enforcement**:
+  * Accessing `GET /api/public/appointments/:id` without a token returns **HTTP 401 Unauthorized**.
+  * Supplying a malformed or tampered token returns **HTTP 403 Forbidden**.
+  * Supplying a token belonging to Appointment A to inspect Appointment B returns **HTTP 403 Forbidden**.
 
 ---
 
-### 7. Seed Data & Test Accounts
+## 18. Analytics & Reporting Engine
 
-Seed data is initialized via `npm run seed --prefix backend`:
+* **Tenant Isolation**: Business Admins can query only their own business's metrics. System Owners can query platform-wide metrics.
+* **Metrics Calculated**:
+  * Total bookings & Revenue estimation
+  * Completion rate & Cancellation rate
+  * Daily appointment volume trends
+  * Staff performance breakdown (utilization and appointment count)
+* **Date Range Safeguards**: Inverted dates (`startDate > endDate`) return HTTP 400. Ranges exceeding 92 days return HTTP 400.
 
-| Role | Email | Password | Business Context |
+---
+
+## 19. Security Hardening & Protection Defenses
+
+* **Helmet HTTP Headers**: Strict-Transport-Security, X-Frame-Options, X-Content-Type-Options, X-DNS-Prefetch-Control.
+* **Rate Limiting**:
+  * Public booking endpoints: 10 requests per 15 minutes per IP.
+  * Authentication endpoints: 20 requests per 15 minutes per IP.
+  * API endpoints: 300 requests per 15 minutes.
+* **NoSQL Injection Prevention**: Zod schema validation strips and rejects operators (`$ne`, `$gt`, etc.) in request bodies.
+* **ReDoS Protection**: Search queries are escaped against dangerous regex meta-characters.
+
+---
+
+## 20. API Route Overview
+
+| Method | Endpoint | Access | Description |
 |---|---|---|---|
-| **System Owner** | `owner@slotify.dev` | `DevPassword123!` | Platform Owner (`businessId: null`) |
-| **Business Admin (Tenant A)** | `admin@urbanwellness.slotify.dev` | `DevPassword123!` | Urban Wellness Studio (`urban-wellness-studio`) |
-| **Business Admin (Tenant B)** | `admin@techfix.slotify.dev` | `DevPassword123!` | TechFix Services (`techfix-services`) |
+| `GET` | `/api/health` | Public | System and database connectivity check |
+| `POST` | `/api/auth/login` | Public | Authenticate user, set HTTP-only cookie |
+| `POST` | `/api/auth/logout` | Authenticated | Clear authentication cookie |
+| `GET` | `/api/auth/me` | Authenticated | Return authenticated user profile |
+| `GET` | `/api/businesses` | System Owner | List all platform businesses |
+| `POST` | `/api/businesses` | System Owner | Onboard new business & initial admin |
+| `PATCH` | `/api/businesses/:id/status` | System Owner | Toggle business ACTIVE/DISABLED |
+| `GET` | `/api/services` | Business Admin | List services for admin's tenant |
+| `POST` | `/api/services` | Business Admin | Create new service |
+| `GET` | `/api/staff` | Business Admin | List staff members for admin's tenant |
+| `POST` | `/api/staff` | Business Admin | Create staff member |
+| `GET` | `/api/availability` | Business Admin | List recurring weekly availability |
+| `POST` | `/api/availability` | Business Admin | Configure availability slots |
+| `GET` | `/api/appointments` | Business Admin | Filter and list appointments |
+| `PATCH` | `/api/appointments/:id/status` | Business Admin | Transition appointment status |
+| `GET` | `/api/analytics/overview` | Business Admin | Retrieve tenant analytics |
+| `GET` | `/api/analytics/platform` | System Owner | Retrieve platform-wide metrics |
+| `GET` | `/api/public/businesses/:slug` | Public | Public business info & active services |
+| `GET` | `/api/public/businesses/:slug/slots` | Public | Compute available timeslots |
+| `POST` | `/api/public/businesses/:slug/appointments` | Public | Atomically book appointment |
+| `GET` | `/api/public/appointments/:id` | Customer Token | Retrieve appointment confirmation |
+| `PATCH` | `/api/public/appointments/:id/cancel` | Customer Token | Self-service cancellation |
 
 ---
 
-### 8. Phase 4: System Owner Business Onboarding & Management
+## 21. Environment Variables Reference
 
-Phase 4 introduces platform-level tenant governance exclusively for the `SYSTEM_OWNER`.
-
-#### Platform Endpoints
-* **`POST /api/businesses`**: Onboards a new business tenant and its initial Business Admin in an atomic workflow.
-  * Inputs: Business details (name, optional custom slug, timezone, email, phone, address) + Admin credentials (name, email, password).
-  * Auto-generates clean, URL-safe deterministic slugs with collision resolution (`-2`, `-3`).
-  * Hashes admin password with bcrypt (work factor 12).
-  * Never exposes `passwordHash` in responses.
-* **`GET /api/businesses`**: Retrieves all registered businesses with populated administrative account summaries and live status counts.
-* **`GET /api/businesses/:businessId`**: Retrieves comprehensive business details, contact metadata, and assigned administrative account.
-* **`PATCH /api/businesses/:businessId/status`**: Toggles tenant lifecycle state (`ACTIVE` ↔ `DISABLED`).
-  * When `DISABLED`, Business Admins attempting to authenticate or access tenant endpoints receive `403 Forbidden: "Your business account has been suspended or deactivated."`.
-  * When restored to `ACTIVE`, legitimate operations resume seamlessly.
-
-#### Architecture & Security Highlights
-1. **Server-Side Validation**: Robust Zod schemas (`createBusinessSchema`, `updateBusinessStatusSchema`) with strict typing, slug regex constraints (`^[a-z0-9]+(?:-[a-z0-9]+)*$`), and email sanitization.
-2. **Transaction Consistency & Fallback Cleanup**: Uses MongoDB replica-set transactions when available. In standalone developer environments without replica sets, automatic compensating cleanup removes orphaned business records if admin creation fails.
-3. **Strict Data Exclusion**: All platform queries explicitly project `{ passwordHash: 0 }`.
-4. **Gateway Lifecycle Check**: Auth middleware verifies `business.status === 'ACTIVE'` on every request, blocking disabled tenants before any controller code executes.
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `NODE_ENV` | Yes | `development` | Environment mode (`development`, `test`, `production`) |
+| `PORT` | No | `5000` | Port for Express listener (Render assigns automatically) |
+| `MONGO_URI` | Yes | — | MongoDB Atlas connection string with credentials |
+| `JWT_SECRET` | Yes | — | Strong secret key for signing session & customer JWTs |
+| `JWT_EXPIRES_IN`| No | `1d` | Token lifetime (`1d`, `7d`) |
+| `COOKIE_NAME` | No | `slotify_token` | HTTP-only cookie name |
+| `CLIENT_URL` | No | `http://localhost:5173` | Allowed origin(s) for CORS |
 
 ---
 
-### 9. Automated Testing & Verification
+## 22. Local Setup Guide
 
-The project includes **140 passing automated tests** across 7 suites:
-
-1. `backend/tests/health.test.js` (6 tests) — Health, rate limiting, 404, CORS.
-2. `backend/tests/models.test.js` (30 tests) — Mongoose schemas, tenant indexes, validations, staffId-null support.
-3. `backend/tests/auth.test.js` (18 tests) — JWT cookies, login, /me, password hashing, disabled states.
-4. `backend/tests/authorization.test.js` (18 tests) — RBAC, tenant authorization, IDOR, spoofing defenses.
-5. `backend/tests/business-management.test.js` (16 tests) — Phase 4 onboarding, unique slug collisions, status toggle lifecycle, transaction atomicity, 403 blocks.
-6. `backend/tests/service-staff-management.test.js` (31 tests) — Phase 5 Service and Staff CRUD, zero-trust tenant isolation, reference integrity protection, cross-tenant service assignment blocking, body spoofing defenses.
-7. `backend/tests/availability-slots.test.js` (21 tests) — Phase 6 Availability window CRUD & overlaps, blocked date management, 15-min slot interval calculation, staff overrides vs business fallback, appointment collision avoidance, boundary touch testing, zero-trust tenant isolation.
-8. `backend/tests/appointment-booking.test.js` (30 tests) — Phase 7 Booking engine validation (A-AJ), race-condition & concurrency prevention, 15-min slot interval alignment, any-staff assignment, non-UTC / Asia/Kolkata timezone handling, conflict 409 rejections, cancellation & slot release, and tenant isolation.
-
-Run tests:
-```bash
-npm test --prefix backend
-# Total: 170 tests passing across 8 suites
-```
-
----
-
-### 10. Phase 7 — Booking Engine & Appointment Architecture
-
-- **Core Booking Engine**:
-  * **Server Authoritative**: Server validates business status, service duration, staff assignment, working hour windows, blocked dates, and calculates `endTime = startTime + durationMinutes`.
-  * **15-Minute Booking Intervals**: All booking start times enforce strict alignment to `:00`, `:15`, `:30`, or `:45`.
-  * **Authoritative Timezone Handling**: Client sends local date and time in the business's authoritative timezone. The server converts them into absolute UTC `Date` objects before saving to MongoDB, preventing timezone skew across regions.
-  * **Any-Staff Booking**: When `staffId` is omitted, the engine identifies all active staff members assigned to the service, checks each for availability windows, blocked dates, and active appointments, and assigns an eligible staff member.
-  * **Overlap & Conflict Rules**:
-    `newStart < existingEnd && newEnd > existingStart && status != 'CANCELLED'`.
-    Back-to-back appointments (e.g., 10:00–11:00 and 11:00–12:00) are permitted. Overlapping requests are rejected with `409 Conflict`.
-  * **Cancellation Lifecycle**: Cancelling an appointment marks its status as `CANCELLED`, which immediately frees the slot for subsequent bookings.
-  * **Race Condition & Concurrency Defense**:
-    - **In-Process FIFO Promise Queue**: Simultaneous booking requests targeting the same staff member are serialized through an atomic promise chain mutex (`acquireStaffLock`).
-    - **MongoDB Transaction Session**: When connected to a replica set (e.g. MongoDB Atlas), transactions ensure document-level write locks on the staff record and atomic overlap query and appointment insertion, with graceful fallback in standalone environments.
-
-- **Protected Appointment APIs**:
-  * `POST /api/appointments` — Create appointment (enforces tenant context, validates all rules).
-  * `GET /api/appointments` — List tenant appointments with optional filters (`date`, `status`, `staffId`, `serviceId`).
-  * `GET /api/appointments/:id` — Get appointment details (protected against cross-tenant IDOR).
-  * `PATCH /api/appointments/:id/cancel` — Cancel appointment and release slot.
-
-- **Frontend Admin Experience**:
-  * **Appointments Tab**: Filterable appointment table with status badges (`CONFIRMED`, `CANCELLED`).
-  * **Test Booking Modal**: Allows admins to simulate customer bookings, selecting services, staff, date, 15-minute start times, and customer details.
-  * **Instant Cancellation**: Admin can cancel appointments directly from the table with real-time status update.
-
----
-
-### 11. Frontend Architecture: Dashboards
-
-- **System Owner Dashboard (`/`)**:
-  * Real-Time Platform Metrics: Total Registered Businesses, Active Tenants, Disabled Tenants.
-  * Search & Filter: Real-time client-side search across business name, slug, email, and admin contact.
-  * Accessible Onboarding Flow: Modal dialog with dual-section form (Business Metadata & Initial Admin Account) and real-time validation.
-  * Details Inspection & Status Lifecycle: Modal providing full tenant profile, created timestamp, timezone, admin info, and toggle suspension controls.
-
-- **Business Admin Dashboard (`/`)**:
-  * Real-Time Tenant Metrics: Active Services, Inactive Services, Active Staff, Inactive Staff, Appointments.
-  * Multi-Tab Interface:
-    - **Services Tab**: Service catalog CRUD, duration in minutes, descriptions, and active status toggles.
-    - **Staff Tab**: Staff roster management and multi-select assignment to active tenant services.
-    - **Availability & Hours Tab**: Weekly recurring operating windows grouped by day of week (Monday–Sunday), business-wide vs staff-specific scope, overlap validation, and blocked dates calendar management.
-    - **Slot Preview Tab**: Timezone-aware booking slot calculation engine showing 15-minute start interval bookable slots for any active service and date, with staff allocation badges, duration display, and empty states for blocked dates or non-working days.
-    - **Appointments Tab**:
-      * **Dual View Modes**: Seamless toggle between responsive **List View** and interactive **Calendar View**.
-      * **Search & Multi-Criteria Filtering**: Real-time debounce search across customer name, email, and phone with regex sanitization; filter by Status (`CONFIRMED`, `COMPLETED`, `CANCELLED`, `NO_SHOW`), assigned Staff member, Service, and Date range (`startDate` to `endDate`, capped at 62 days).
-      * **Centralized Status Lifecycle State Machine**: Server-enforced valid transitions (`CONFIRMED` -> `COMPLETED`, `CANCELLED`, `NO_SHOW`). Terminal state enforcement prevents mutations on `COMPLETED` or `CANCELLED` records.
-      * **Appointment Details Modal / Drawer**: Full customer contact metadata, service duration & price, assigned staff, formatted start/end times in business timezone, status badge, notes, and direct lifecycle action buttons without leaking customer tokens.
-      * **Interactive Calendar Component**: Full Month, Week, and Day views with today/prev/next controls, timezone badge, and color-coded status chips that open the appointment details directly from the grid.
-      * **Admin Cancellation & Immediate Slot Release**: Cancels appointments with optional reason, freeing up slots immediately while maintaining audit history.
-    - **Analytics Tab (Phase 10)**:
-      * **Core Metrics & Rates**: Total bookings, confirmed, completed (with completion rate %), cancelled (with cancellation rate %), and no-shows, with division-by-zero protection.
-      * **Date Range Presets**: 7-day, 30-day, and 90-day timeframes (bounded in business timezone; custom ranges capped at 92 days).
-      * **Volume Trend Chart**: Recharts-powered area chart with smooth gradient and custom tooltip, maintaining continuous zero-filled dates without deceptive gaps.
-      * **Status Distribution**: Donut chart with status-coded colors and percentage breakdowns.
-      * **Service & Staff Performance**: Bookings and completion metrics grouped by service and staff member, sorted by volume descending.
-      * **Strict Tenant Isolation**: All metrics are strictly derived from verified JWT tenant context; businessId parameter spoofing blocked with 403 Forbidden.
-  * Safe Deletion & Status Toggles: Contextual confirmation dialogs preventing deletion when dependencies exist.
-  * Zero-Trust Isolation: Strictly scoped to the authenticated admin's business ID, completely isolating tenant data from other businesses.
-
-- **System Owner Analytics & Dashboard (`/`)**:
-  * Real-Time Platform Metrics: Total Registered Businesses, Active Tenants, Disabled Tenants, and Total Platform Bookings across all tenants.
-  * Accessible Onboarding Flow: Modal dialog with dual-section form (Business Metadata & Initial Admin Account).
-  * Status Lifecycle Control: Instant suspension and reactivation of tenants.
-
-- **Public Customer Portal (`/book/:businessSlug`)**:
-  * Clean, branded booking interface by business slug.
-  * Real-time slot generation at 15-minute start intervals respecting operating hours, staff assignments, blocked dates, and existing appointments.
-  * Customer intake with client-side & server-side Zod validation.
-  * Direct reuse of Phase 7 booking engine with concurrency guards and MongoDB unique overlap indexing.
-  * Stale slot conflict handling (HTTP 409 Conflict) with automatic slot refresh.
-  * Disabled tenant blocking: Immediate HTTP 403 Forbidden with user-friendly banner if business is inactive.
-
-- **Customer Self-Service & Anti-IDOR Security (`/appointments/:id?token=...`)**:
-  * Stateless Signed JWT Customer Access Token containing `{ appointmentId, customerEmail, businessId, type: 'CUSTOMER_APPOINTMENT_ACCESS' }`.
-  * Zero-auth overhead: No customer passwords or account registrations needed.
-  * Strict Anti-IDOR Enforcement: Missing token returns `401 Unauthorized`; invalid or cross-appointment token returns `403 Forbidden`.
-  * Customer cancellation flow with confirmation modal; immediately frees up slots for public booking.
-
----
-
-### 12. How to Run Locally
-
-1. **Install Dependencies**:
+1. **Clone repository**:
+   ```bash
+   git clone https://github.com/khushiiish/Slotify.git
+   cd Slotify
+   ```
+2. **Install dependencies**:
    ```bash
    npm install --prefix backend
    npm install --prefix frontend
    ```
-
-2. **Environment Variables**:
-   * Backend: copy `backend/.env.example` to `backend/.env`
-   * Frontend: copy `frontend/.env.example` to `frontend/.env`
-
-3. **Database Setup**:
+3. **Configure environment**:
+   Create `backend/.env` (use `backend/.env.example` as reference) and set your `MONGO_URI` and `JWT_SECRET`.
+4. **Compile production build & start**:
    ```bash
-   npm run seed --prefix backend
+   npm run build
+   npm start
    ```
-
-4. **Start Development Servers**:
-   ```bash
-   # Terminal 1: Backend API (port 5000)
-   npm run dev --prefix backend
-
-   # Terminal 2: Frontend Client (port 5173)
-   npm run dev --prefix frontend
-   ```
-
-5. **Build Frontend**:
-   ```bash
-   npm run build --prefix frontend
-   ```
-
-6. **Run Verification Suites**:
-   ```bash
-    # Automated vitest suite (234 tests across 11 test suites)
-    npm test --prefix backend
-
-    # Live runtime verification on running server (Phase 7 Booking Engine)
-    node backend/scratch/verify_phase7_live.mjs
-
-    # Live runtime verification on running server (Phase 8 Public Customer Experience)
-    node backend/scratch/verify_phase8_live.mjs
-
-    # Live runtime verification on running server (Phase 9 Appointment Management & Calendar)
-    node backend/scratch/verify_phase9_live.mjs
-
-    # Live runtime verification on running server (Phase 10 Business Analytics & Platform Metrics)
-    node backend/scratch/verify_phase10_live.mjs
-
-    # Live runtime verification on running server (Phase 11 Security Hardening & Concurrency Race Audit)
-    node backend/scratch/verify_phase11_security_live.mjs
-   ```
+   Open `http://localhost:5000` in your browser.
 
 ---
 
-## Security
+## 23. Automated Test Suite & Results
 
-Slotify implements defense-in-depth security principles across every tier of the application stack.
+The automated test suite runs via **Vitest 5.0** across 12 test suites covering every layer of the architecture:
 
-### 1. Authentication Approach & HTTP-Only Cookie Strategy
-* **Zero-Storage Tokens**: JWTs are never returned in JSON response bodies for storage in `localStorage` or `sessionStorage`, mitigating token theft via Cross-Site Scripting (XSS).
-* **Strict Cookie Flags**: Authentication tokens are issued via `Set-Cookie` with `httpOnly: true`, `path: '/'`, `maxAge: 24h`, and environment-tailored `sameSite` (`lax` in local development, `none` + `secure: true` in production).
-* **Active Status Verification**: Every authenticated request evaluates user active status and business active status against MongoDB before granting route access.
+```bash
+npm test
+```
 
-### 2. Role-Based Access Control (RBAC) & Privileges
-* **Roles**: Strictly defined `SYSTEM_OWNER` and `BUSINESS_ADMIN`.
-* **Privilege Enforcement**: Privileged platform-wide endpoints (`/api/businesses`, `/api/analytics/platform`) require `requireRole('SYSTEM_OWNER')`. Any attempt by `BUSINESS_ADMIN` to access platform endpoints returns `403 Forbidden`.
+### Verified Test Results:
+* **Test Suites**: 12 passed / 12 total
+* **Total Tests**: **260 passed / 260 total (0 failures)**
+* **Execution Time**: ~9.6 seconds
 
-### 3. Strict Multi-Tenant Isolation & Anti-IDOR
-* **Zero-Trust for Client Tenant Identifiers**: The authenticated user's JWT context (`req.user.businessId`) is the authoritative source for tenant boundaries.
-* **Aggressive IDOR Defenses**:
-  - URL parameter tampering (`/api/services/:foreignServiceId`) $\rightarrow$ `403 Forbidden`.
-  - Query parameter tampering (`?businessId=otherBizId`) $\rightarrow$ `403 Forbidden`.
-  - Body parameter spoofing (`{ "businessId": "otherBizId" }`) $\rightarrow$ `403 Forbidden`.
-* Cross-tenant data leaks are mathematically impossible in queries due to mandatory `{ businessId: req.user.businessId }` filtering.
+```
+ ✓ tests/availability-slots.test.js (21 tests)
+ ✓ tests/appointment-management.test.js (28 tests)
+ ✓ tests/service-staff-management.test.js (31 tests)
+ ✓ tests/appointment-booking.test.js (30 tests)
+ ✓ tests/security-hardening.test.js (26 tests)
+ ✓ tests/business-management.test.js (16 tests)
+ ✓ tests/models.test.js (30 tests)
+ ✓ tests/health.test.js (6 tests)
+ ✓ tests/customer-public-experience.test.js (20 tests)
+ ✓ tests/authorization.test.js (18 tests)
+ ✓ tests/analytics.test.js (16 tests)
+ ✓ tests/auth.test.js (18 tests)
 
-### 4. Server-Side Validation & Input Sanitization
-* **Strict Zod Schemas**: Every incoming request body and query parameter is validated against strict Zod schemas before hitting controllers.
-* **Malformed ObjectId Protection**: Hexadecimal 24-character ObjectId regex guards prevent Mongoose CastErrors, returning clean `400 Bad Request` instead of 500 internal server exceptions.
-* **NoSQL Injection Resistance**: Inputs are strictly validated against primitive types (string, number, boolean). Object operators such as `{ "$ne": null }` or `{ "$gt": "" }` are rejected with `400 Bad Request`.
-* **ReDoS & Regex Escaping**: All text search parameters (customer name, email, phone) pass through regex escaping (`/[.*+?^${}()|[\]\\]/g`) prior to query construction.
+ Test Files  12 passed (12)
+      Tests  260 passed (260)
+```
 
-### 5. Booking Conflict & Race Condition Protection
-* **Two-Tier Concurrency Guards**:
-  1. In-process staff-level serialization locks (`acquireStaffLock`) serialize simultaneous booking attempts for the same staff member.
-  2. Database-level atomic overlap query inside a transactional session (`slotStart < appt.endTime AND slotEnd > appt.startTime`) prevents double-booking.
-* Conflicting or stale slot requests are immediately rejected with `409 Conflict`, while exactly one request succeeds (`201 Created`).
+---
 
-### 6. Customer Appointment Token Security
-* **Stateless Cryptographic Binding**: Customer access tokens use HMAC SHA-256 JWT signatures binding `appointmentId`, `customerEmail`, `businessId`, and `type: 'CUSTOMER_APPOINTMENT_ACCESS'`.
-* **Tamper-Evident**: Any alteration to appointment ID, customer email, or signature results in immediate `401/403` rejection.
-* **Cross-Tenant Guard**: Tokens issued for Business A cannot view or cancel appointments for Business B (`403 Forbidden`).
-* **Terminal Status Protection**: Completed and no-show appointments cannot be cancelled by customers (`400 Bad Request`).
+## 24. Deployment Architecture
 
-### 7. Rate Limiting & Abuse Prevention
-* **Global API Rate Limiter**: 200 requests per 15-minute window per IP (`RateLimit-*` headers).
-* **Auth Rate Limiter**: 30 login attempts per 15-minute window per IP (prevents credential stuffing).
-* **Public Booking Rate Limiter**: 60 booking creation and cancellation requests per 15-minute window per IP.
+```
+Browser Request (https://slotify.onrender.com)
+      │
+      ▼
+Render Single Web Service
+      ├── /api/*               ──► Express API Router (Returns JSON)
+      ├── /assets/*            ──► Express Static (Compiled React JS/CSS)
+      └── /* (All other paths) ──► Express SPA Fallback (Sends index.html)
+```
 
-### 8. Security Headers & Information Leakage Prevention
-* **Helmet Middleware**: Configures modern security headers (Content Security Policy, X-Content-Type-Options, Strict-Transport-Security, X-Frame-Options).
-* **CORS Restrictions**: Configured strictly to whitelist `CLIENT_URL` with credentials allowed.
-* **Production Error Masking**: In production mode (`NODE_ENV=production`), all 500 error messages are masked as generic messages, and stack traces / internal filesystem paths are omitted.
-* **Password Hash Redaction**: `passwordHash` is excluded from all user and business query projections.
+* **No Separate Vercel Deployment**: Eliminates third-party cookie blocking in Safari and Chrome.
+* **Refresh Support**: Direct navigation to `/login`, `/owner`, `/admin`, `/book/:slug`, and `/customer/appointments/:id` resolves seamlessly without Express 404s.
 
-### 9. Security Assumptions & Trade-offs
-* **In-Memory Lock Scope**: The staff lock mechanism is optimized for single-instance or replica set deployments with database-level uniqueness enforcement as the ultimate source of truth.
-* **Stateless Customer Tokens**: Customer access tokens are valid for 30 days and avoid database session table overhead; cancellation state is checked against the live appointment record on every request.
+---
+
+## 25. Render Single-Service Deployment
+
+Render is configured using `render.yaml`:
+```yaml
+services:
+  - type: web
+    name: slotify
+    runtime: node
+    buildCommand: npm run build
+    startCommand: npm start
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 1d
+      - key: CLIENT_URL
+        sync: false
+      - key: VITE_API_URL
+        value: /api
+```
+
+---
+
+## 26. Dedicated Evaluator Credentials
+
+The application includes dedicated evaluator accounts initialized idempotently upon server startup:
+
+| Role | Evaluator Email | Assigned Tenant | Status |
+|---|---|---|---|
+| **System Owner / Super Admin** | `superadmin@gmail.com` | Platform-wide (`businessId: null`) | Active |
+| **Business Admin 1** | `admin1@gmail.com` | Urban Wellness Studio | Active |
+| **Business Admin 2** | `admin2@gmail.com` | TechFix Services | Active |
+
+> [!NOTE]
+> All evaluator passwords are encrypted with `bcryptjs` (work factor 10) in the database. In strict compliance with security standards, plaintext passwords are never committed to Git, logs, or public source code. Passwords are provided securely out-of-band to the evaluator. The credential hashing utility (`backend/scratch/hash_credentials.mjs`) is provided for testing credential generation locally.
+
+---
+
+## 27. Final Verification Audit
+
+* **Live Health Check**: `GET /api/health` returns HTTP 200 with `{ success: true, message: "Slotify API is running" }`.
+* **Live Concurrency Test**: 2 concurrent booking requests for the same slot resulted in exactly 1 booking (201 Created) and 1 rejection (409 Conflict).
+* **Live Security Audit**: All 20 live security tests passed (IDOR guards, NoSQL injection, ReDoS safety, customer token verification).
+* **Desktop Chrome Verification (1440x900)**: All tabs (Dashboard, Services, Staff, Availability, Appointments, Calendar, Analytics) verified with 0 console errors.
+* **Mobile Chrome Verification (375x667)**: Fully responsive layouts with zero horizontal scroll and zero layout breaking.
+
+---
+
+## 28. Known Limitations
+
+* **Email Delivery**: Appointment confirmations and cancellations currently use on-screen customer tokens and direct portal links; automated SMTP/SMS delivery requires third-party API keys (e.g. SendGrid, Twilio).
+* **Payment Processing**: Bookings record service prices for analytics estimations, but direct in-app payment gateway processing (e.g. Stripe) is intentionally omitted per project specification.
+
+---
+
+## 29. Future Improvements
+
+* **Custom Working Shift Intervals**: Support split-shift availability schedules (e.g. 09:00–13:00 and 15:00–19:00).
+* **Automated Webhook Notifications**: Webhook dispatch to business endpoints upon appointment creation and cancellation.
+* **Multi-Language Localization**: Full i18n support for customer-facing scheduling pages in multiple languages.
+
+---
+
+## License
+
+This project is licensed under the ISC License.

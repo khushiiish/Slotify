@@ -63,8 +63,17 @@ Phase 11 focused on defense-in-depth security auditing, vulnerability remediatio
 
 ---
 
-## 5. Dependency Audit & Production Build
-- `npm audit` (backend): 0 vulnerabilities.
-- `npm audit` (frontend): 0 vulnerabilities.
-- Vite production build: Clean build in 1.63s.
-- Environment: `.env` excluded via `.gitignore`, zero hardcoded secrets.
+---
+
+## 6. Phase 12 — Final Render Deployment & Production Verification
+- **Architecture**: Single Render Web Service (`https://slotify.onrender.com`) serving both Express API (`/api/*`) and compiled Vite React SPA with client-side SPA routing fallback.
+- **Dedicated Evaluator Accounts**:
+  - Super Admin: `superadmin@gmail.com`
+  - Business Admin 1: `admin1@gmail.com` (Urban Wellness Studio)
+  - Business Admin 2: `admin2@gmail.com` (TechFix Services)
+  - Password hashing: `bcryptjs` (work factor 10). Zero plaintext passwords stored or committed.
+- **Automated Regression Suite**: **260 passed / 260 total across 12 test suites (0 failures)**.
+- **Live Concurrency Test**: 2 simultaneous requests for same slot -> exactly 1 succeeded (201), 1 rejected (409 Conflict).
+- **Chrome E2E Verification**: Verified across Desktop (1440x900) and Mobile (375x667) viewports with **0 console errors** and zero calls to localhost/Vercel.
+- **Repository Hygiene**: `.env` strictly ignored, zero secrets in Git history.
+

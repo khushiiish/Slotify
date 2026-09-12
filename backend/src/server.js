@@ -1,6 +1,7 @@
 import app from './app.js';
 import { env } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './config/db.js';
+import { seedDatabase } from './config/seed.js';
 
 let server;
 
@@ -9,8 +10,13 @@ const startServer = async () => {
     // 1. Connect to MongoDB
     await connectDatabase();
 
-    // 2. Start Express server listener
-    server = app.listen(env.PORT, () => {
+    // 2. Idempotently bootstrap database & dedicated evaluator accounts
+    if (process.env.SEED_ON_START !== 'false') {
+      await seedDatabase();
+    }
+
+    // 3. Start Express server listener (bind to 0.0.0.0 for Render compatibility)
+    server = app.listen(env.PORT, '0.0.0.0', () => {
       console.log(`[Server] Slotify API is running on port ${env.PORT} in ${env.NODE_ENV} mode`);
     });
   } catch (error) {

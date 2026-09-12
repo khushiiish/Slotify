@@ -73,9 +73,8 @@ function App() {
     }
   };
 
-  const handleQuickFill = (demoEmail, demoPass) => {
+  const handleQuickFill = (demoEmail) => {
     setEmail(demoEmail);
-    setPassword(demoPass);
     clearError();
   };
 
@@ -132,9 +131,11 @@ function App() {
     );
   }
 
-  // 2. Check if on customer appointment view /appointments/:id
-  if (currentPath.startsWith('/appointments/')) {
-    const appointmentId = currentPath.replace('/appointments/', '').split('/')[0];
+  // 2. Check if on customer appointment view /appointments/:id or /customer/appointments/:id
+  if (currentPath.startsWith('/customer/appointments/') || currentPath.startsWith('/appointments/')) {
+    const appointmentId = currentPath.startsWith('/customer/appointments/')
+      ? currentPath.replace('/customer/appointments/', '').split('/')[0]
+      : currentPath.replace('/appointments/', '').split('/')[0];
     const token = new URLSearchParams(searchParams).get('token') || '';
     return (
       <div>
@@ -169,8 +170,8 @@ function App() {
     );
   }
 
-  // 3. Authenticated Dashboards on root route '/'
-  if (currentPath === '/' && isAuthenticated) {
+  // 3. Authenticated Dashboards on root route '/', '/owner', or '/admin'
+  if ((currentPath === '/' || currentPath === '/owner' || currentPath === '/admin') && isAuthenticated) {
     if (user?.role === 'SYSTEM_OWNER') {
       return <SystemOwnerDashboard user={user} onLogout={logout} />;
     }
@@ -418,13 +419,13 @@ function App() {
 
             <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
               <p style={{ fontSize: '13px', color: 'var(--text)', margin: '0 0 10px 0', fontWeight: 500 }}>
-                Demo Credentials (Quick-Fill):
+                Evaluator Accounts (Quick-Fill Email):
               </p>
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   id="quickfill-owner-btn"
-                  onClick={() => handleQuickFill('owner@slotify.dev', 'DevPassword123!')}
+                  onClick={() => handleQuickFill('superadmin@gmail.com')}
                   style={{
                     padding: '6px 12px',
                     fontSize: '12px',
@@ -435,12 +436,12 @@ function App() {
                     cursor: 'pointer',
                   }}
                 >
-                  System Owner
+                  Super Admin
                 </button>
                 <button
                   type="button"
                   id="quickfill-admin-a-btn"
-                  onClick={() => handleQuickFill('admin@urbanwellness.slotify.dev', 'DevPassword123!')}
+                  onClick={() => handleQuickFill('admin1@gmail.com')}
                   style={{
                     padding: '6px 12px',
                     fontSize: '12px',
@@ -451,12 +452,12 @@ function App() {
                     cursor: 'pointer',
                   }}
                 >
-                  Admin A (Urban Wellness)
+                  Admin 1 (Urban Wellness)
                 </button>
                 <button
                   type="button"
                   id="quickfill-admin-b-btn"
-                  onClick={() => handleQuickFill('admin@techfix.slotify.dev', 'DevPassword123!')}
+                  onClick={() => handleQuickFill('admin2@gmail.com')}
                   style={{
                     padding: '6px 12px',
                     fontSize: '12px',
@@ -467,7 +468,7 @@ function App() {
                     cursor: 'pointer',
                   }}
                 >
-                  Admin B (TechFix)
+                  Admin 2 (TechFix)
                 </button>
               </div>
             </div>
