@@ -204,7 +204,7 @@ Slotify/
 │   │   ├── utils/               # cookie helpers, jwt token signing, timezone helpers
 │   │   └── validators/          # Zod validation schemas for request bodies and queries
 │   ├── scratch/                 # hash_credentials.mjs, verify_phase11_security_live.mjs
-│   └── tests/                   # 12 Vitest suites covering all 260 unit and integration tests
+│   └── tests/                   # 13 Vitest suites covering all 273 unit and integration tests
 └── frontend/
     ├── package.json             # Frontend dependencies (react, lucide-react, recharts, fullcalendar)
     ├── vite.config.js           # Vite build configuration with React plugin
@@ -304,7 +304,35 @@ To eliminate double-booking race conditions during high-volume customer scheduli
 
 ---
 
-## 16. Appointment Lifecycle & State Machine
+## 16. Public Business Discovery & Customer Journey
+
+Slotify allows public customers to discover and search active businesses without requiring a customer login or account creation:
+
+```
+Landing Page
+     ↓
+Browse / Search Businesses (GET /api/public/businesses?search=...)
+     ↓
+Select Business → Click [ Book Appointment ]
+     ↓
+Public Booking Portal (/book/:businessSlug)
+     ↓
+Select Service → Date → 15m Slot → Fill Customer Details → Book
+     ↓
+Instant Confirmation with Signed Customer Access Token
+     ↓
+Direct Self-Service Customer Management (/customer/appointments/:id)
+```
+
+* **Server-Enforced Active Status**: `GET /api/public/businesses` strictly filters for `status: "ACTIVE"`. Any client status override parameter (e.g. `?status=DISABLED`) is authoritatively ignored by the server.
+* **Disabled Business Exclusion**: Businesses set to `DISABLED` by the System Owner are immediately hidden from the public discovery list. Direct navigation to `/book/:disabledSlug` rejects slot generation and bookings.
+* **ReDoS-Safe Search**: The server sanitizes search input using regular expression escaping (`/[.*+?^${}()|[\]\\]/g`), preventing NoSQL operator injection and ReDoS attacks.
+* **Safe Projection**: Public discovery endpoints only return public-facing fields (`id`, `name`, `slug`, `contactEmail`, `contactPhone`, `address`, `timezone`, `status`), ensuring zero leakage of user passwords, internal credentials, or administrative metadata.
+* **Zero Customer Login Requirement**: Preserves frictionless customer scheduling and anti-IDOR tokenized management via signed JWT customer tokens.
+
+---
+
+## 17. Appointment Lifecycle & State Machine
 
 ```
                   ┌───────────────┐
@@ -389,6 +417,7 @@ To eliminate double-booking race conditions during high-volume customer scheduli
 | `PATCH` | `/api/appointments/:id/status` | Business Admin | Transition appointment status |
 | `GET` | `/api/analytics/overview` | Business Admin | Retrieve tenant analytics |
 | `GET` | `/api/analytics/platform` | System Owner | Retrieve platform-wide metrics |
+| `GET` | `/api/public/businesses` | Public | List active businesses for discovery (safe regex search) |
 | `GET` | `/api/public/businesses/:slug` | Public | Public business info & active services |
 | `GET` | `/api/public/businesses/:slug/slots` | Public | Compute available timeslots |
 | `POST` | `/api/public/businesses/:slug/appointments` | Public | Atomically book appointment |

@@ -9,6 +9,47 @@ import { env } from '../config/env.js';
 const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 
 /**
+ * Retrieve public-safe list of active businesses for public discovery.
+ * Enforces status === 'ACTIVE' server-side, strictly ignoring client status manipulation.
+ * Excludes private administrative details, credentials, and internal metadata.
+ * Safely filters by search term across name, slug, and address without regex injection risks.
+ *
+ * @param {string} [searchQuery] - Optional search term
+ * @returns {Promise<Array<object>>} List of active, public-safe businesses
+ */
+export const listPublicBusinesses = async (searchQuery) => {
+  const filter = { status: 'ACTIVE' };
+
+  if (searchQuery && typeof searchQuery === 'string' && searchQuery.trim()) {
+    // Sanitize user regex input to prevent ReDoS / NoSQL operator injection
+    const sanitized = searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = new RegExp(sanitized, 'i');
+    filter.$or = [
+      { name: searchRegex },
+      { slug: searchRegex },
+      { address: searchRegex },
+    ];
+  }
+
+  const businesses = await Business.find(filter)
+    .select('_id name slug contactEmail contactPhone address timezone status createdAt')
+    .sort({ name: 1 })
+    .lean();
+
+  return businesses.map((b) => ({
+    id: b._id.toString(),
+    _id: b._id,
+    name: b.name,
+    slug: b.slug,
+    contactEmail: b.contactEmail || null,
+    contactPhone: b.contactPhone || null,
+    address: b.address || null,
+    timezone: b.timezone || 'Asia/Kolkata',
+    status: b.status,
+  }));
+};
+
+/**
  * Retrieve public-safe business information and its active services by business slug.
  * Excludes private administrative details, password hashes, and internal metadata.
  *

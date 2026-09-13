@@ -5,6 +5,7 @@ import {
   publicBookingSchema,
 } from '../validators/public.validator.js';
 import {
+  listBusinesses,
   getBusinessBySlug,
   getSlotsBySlug,
   createAppointment,
@@ -15,8 +16,10 @@ import { publicBookingRateLimiter } from '../middleware/rateLimit.middleware.js'
 
 const router = Router();
 
-// Public Business & Scheduling Discovery
+// Public Business Discovery
+router.get('/businesses', listBusinesses);
 router.get('/businesses/:slug', getBusinessBySlug);
+router.get('/business/:slug', getBusinessBySlug); // Alias for compatibility
 router.get('/businesses/:slug/slots', validateQuery(publicSlotQuerySchema), getSlotsBySlug);
 router.post('/businesses/:slug/appointments', publicBookingRateLimiter, validateBody(publicBookingSchema), createAppointment);
 

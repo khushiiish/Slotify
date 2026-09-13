@@ -497,13 +497,13 @@ export default function PublicBookingPage({ slug, onNavigate }) {
                       padding: '4px',
                     }}
                   >
-                    {slots.map((s) => {
+                    {slots.map((s, idx) => {
                       const slotTime = s.localStartTime || s.time;
                       const isChosen = selectedSlot === slotTime;
                       return (
                         <button
                           type="button"
-                          key={slotTime}
+                          key={`${slotTime}-${s.staffId || idx}`}
                           id={`slot-btn-${slotTime.replace(':', '-')}`}
                           onClick={() => setSelectedSlot(slotTime)}
                           style={{

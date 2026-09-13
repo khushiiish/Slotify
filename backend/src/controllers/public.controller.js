@@ -2,6 +2,25 @@ import * as publicService from '../services/public.service.js';
 
 /**
  * Public business discovery endpoint.
+ * GET /api/public/businesses
+ */
+export const listBusinesses = async (req, res, next) => {
+  try {
+    const { search } = req.query;
+    const businesses = await publicService.listPublicBusinesses(search);
+
+    res.status(200).json({
+      success: true,
+      data: businesses,
+      count: businesses.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Public business discovery endpoint.
  * GET /api/public/businesses/:slug
  */
 export const getBusinessBySlug = async (req, res, next) => {

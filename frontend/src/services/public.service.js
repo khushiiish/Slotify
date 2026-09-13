@@ -1,6 +1,15 @@
 import api from './api.js';
 
 /**
+ * Fetch list of public active businesses for discovery.
+ * Optionally accepts { search } query parameter.
+ */
+export const getPublicBusinesses = async (params = {}) => {
+  const response = await api.get('/public/businesses', { params });
+  return response.data;
+};
+
+/**
  * Fetch public business profile and active services by slug.
  */
 export const getPublicBusiness = async (slug) => {
