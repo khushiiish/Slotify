@@ -217,18 +217,7 @@ npm test
 
 ---
 
-## Demo Credentials
 
-Pre-seeded accounts for live evaluation:
-
-| Role | Email | Password | Access Scope |
-|---|---|---|---|
-| **System Owner** | `superadmin@gmail.com` | `Password123!` | Platform administration, business creation, platform metrics |
-| **Business Admin 1** | `admin1@gmail.com` | `Password123!` | *Urban Wellness Studio* (`Asia/Kolkata` timezone) |
-| **Business Admin 2** | `admin2@gmail.com` | `Password123!` | *TechFix Services* (`America/Los_Angeles` timezone) |
-| **Customer** | *No account required* | *N/A* | Public booking via landing page or direct `/book/:slug` link |
-
-> **Note:** The sign-in page features one-click quick-fill buttons for all evaluator accounts.
 
 ---
 
