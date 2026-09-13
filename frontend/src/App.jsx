@@ -6,7 +6,7 @@ import BusinessAdminDashboard from './pages/BusinessAdminDashboard.jsx';
 import PublicBookingPage from './pages/PublicBookingPage.jsx';
 import CustomerAppointmentView from './pages/CustomerAppointmentView.jsx';
 import LandingPage from './pages/LandingPage.jsx';
-import { Calendar, UserCheck, LogOut, LayoutDashboard, Globe } from 'lucide-react';
+import { Calendar, UserCheck, LogOut, LayoutDashboard, Globe, Eye, EyeOff } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -21,6 +21,7 @@ function App() {
   // Form state for login
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Path routing
@@ -66,10 +67,17 @@ function App() {
     e.preventDefault();
     clearError();
     setSubmitting(true);
-    const success = await login({ email, password });
+    const result = await login({ email: email.trim(), password });
     setSubmitting(false);
-    if (success) {
-      navigateTo('/');
+    if (result && result.success) {
+      const targetRole = result.user?.role || user?.role;
+      if (targetRole === 'BUSINESS_ADMIN') {
+        navigateTo('/admin');
+      } else if (targetRole === 'SYSTEM_OWNER') {
+        navigateTo('/owner');
+      } else {
+        navigateTo('/');
+      }
     }
   };
 
@@ -375,24 +383,47 @@ function App() {
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: 'var(--text-h)', marginBottom: '6px' }}>
                   Password
                 </label>
-                <input
-                  id="login-password-input"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    fontSize: '14px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg)',
-                    color: 'var(--text-h)',
-                    boxSizing: 'border-box',
-                  }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id="login-password-input"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '10px 40px 10px 12px',
+                      fontSize: '14px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg)',
+                      color: 'var(--text-h)',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--text)',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               <button

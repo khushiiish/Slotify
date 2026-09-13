@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Building2, UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { X, Building2, UserPlus, AlertCircle, CheckCircle2, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { onboardBusiness } from '../services/business.service.js';
 
 const TIMEZONES = [
@@ -33,6 +33,9 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [createdResult, setCreatedResult] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
@@ -83,13 +86,45 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
       };
 
       const result = await onboardBusiness(payload);
+      setCreatedResult({
+        business: result.data.business,
+        admin: result.data.admin,
+        password: formData.adminPassword,
+      });
       onSuccess(result.data);
-      onClose();
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to onboard business');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCopyCredentials = () => {
+    if (!createdResult) return;
+    const text = `Business: ${createdResult.business.name}\nAdmin Email: ${createdResult.admin.email}\nPassword: ${createdResult.password}\nLogin URL: ${window.location.origin}/login`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+  };
+
+  const handleModalClose = () => {
+    setCreatedResult(null);
+    setCopied(false);
+    setShowPassword(false);
+    setError(null);
+    setFieldErrors({});
+    setFormData({
+      name: '',
+      slug: '',
+      contactEmail: '',
+      contactPhone: '',
+      address: '',
+      timezone: 'Asia/Kolkata',
+      adminName: '',
+      adminEmail: '',
+      adminPassword: '',
+    });
+    onClose();
   };
 
   return (
@@ -140,7 +175,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleModalClose}
             disabled={loading}
             style={{
               background: 'transparent',
@@ -154,8 +189,127 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
           </button>
         </div>
 
-        {/* Modal Body Form */}
-        <form onSubmit={handleSubmit} style={{ overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+        {createdResult ? (
+          <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '16px',
+              borderRadius: '8px',
+              background: '#dcfce7',
+              border: '1px solid #86efac',
+              color: '#166534',
+            }}>
+              <CheckCircle2 size={24} color="#16a34a" />
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
+                  Tenant Onboarded Successfully!
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#166534' }}>
+                  Business and initial Business Admin credentials have been provisioned in MongoDB.
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              background: 'var(--code-bg)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              padding: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}>
+              <div>
+                <span style={{ fontSize: '12px', color: 'var(--text)', display: 'block', marginBottom: '2px' }}>
+                  Business Name
+                </span>
+                <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-h)' }}>
+                  {createdResult.business.name}
+                </span>
+                <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--text)' }}>
+                  (slug: <code>{createdResult.business.slug}</code>)
+                </span>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text)', display: 'block', marginBottom: '2px' }}>
+                  Admin Name
+                </span>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-h)' }}>
+                  {createdResult.admin.name}
+                </span>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '12px', color: 'var(--text)', display: 'block', marginBottom: '2px' }}>
+                  Admin Login Email
+                </span>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-h)', fontFamily: 'monospace' }}>
+                  {createdResult.admin.email}
+                </span>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '12px', color: 'var(--text)', display: 'block', marginBottom: '2px' }}>
+                  Temporary Password
+                </span>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--accent)', fontFamily: 'monospace' }}>
+                  {createdResult.password}
+                </span>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingTop: '8px',
+            }}>
+              <button
+                type="button"
+                id="copy-credentials-btn"
+                onClick={handleCopyCredentials}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '10px 18px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg)',
+                  color: 'var(--text-h)',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {copied ? <Check size={16} color="#16a34a" /> : <Copy size={16} />}
+                {copied ? 'Credentials Copied!' : 'Copy Credentials'}
+              </button>
+
+              <button
+                type="button"
+                id="close-success-onboard-btn"
+                onClick={handleModalClose}
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Done & Return to Dashboard
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
           {error && (
             <div style={{
               display: 'flex',
@@ -400,25 +554,48 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
                 <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600, color: 'var(--text-h)' }}>
                   Temporary Password *
                 </label>
-                <input
-                  type="password"
-                  id="admin-password-input"
-                  name="adminPassword"
-                  value={formData.adminPassword}
-                  onChange={handleChange}
-                  placeholder="Min. 8 characters"
-                  required
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: `1px solid ${fieldErrors.adminPassword ? '#ef4444' : 'var(--border)'}`,
-                    background: 'var(--bg)',
-                    color: 'var(--text-h)',
-                    fontSize: '13px',
-                  }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    id="admin-password-input"
+                    name="adminPassword"
+                    value={formData.adminPassword}
+                    onChange={handleChange}
+                    placeholder="Min. 8 characters"
+                    required
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '8px 36px 8px 12px',
+                      borderRadius: '6px',
+                      border: `1px solid ${fieldErrors.adminPassword ? '#ef4444' : 'var(--border)'}`,
+                      background: 'var(--bg)',
+                      color: 'var(--text-h)',
+                      fontSize: '13px',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--text)',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
                 {fieldErrors.adminPassword && <span style={{ color: '#ef4444', fontSize: '11px' }}>{fieldErrors.adminPassword}</span>}
               </div>
             </div>
@@ -436,7 +613,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
             <button
               type="button"
               id="cancel-onboard-btn"
-              onClick={onClose}
+              onClick={handleModalClose}
               disabled={loading}
               style={{
                 padding: '10px 18px',
@@ -481,6 +658,7 @@ export default function OnboardBusinessModal({ isOpen, onClose, onSuccess }) {
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );
