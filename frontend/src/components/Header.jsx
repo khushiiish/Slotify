@@ -28,7 +28,7 @@ export default function Header({ user, onLogout }) {
           S
         </div>
         <div style={{ textAlign: 'left' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 700, fontSize: '18px', color: 'var(--text-h)' }}>
               Slotify
             </span>
@@ -38,29 +38,31 @@ export default function Header({ user, onLogout }) {
               gap: '4px',
               padding: '2px 8px',
               borderRadius: '9999px',
-              background: '#e0e7ff',
-              color: '#3730a3',
+              background: user?.role === 'SYSTEM_OWNER' ? '#e0e7ff' : '#ecfdf5',
+              color: user?.role === 'SYSTEM_OWNER' ? '#3730a3' : '#065f46',
               fontSize: '11px',
               fontWeight: 700,
               letterSpacing: '0.4px',
               textTransform: 'uppercase',
             }}>
               <ShieldCheck size={12} />
-              Platform Owner
+              {user?.role === 'SYSTEM_OWNER' ? 'Platform Owner' : 'Business Admin'}
             </span>
           </div>
           <p style={{ margin: 0, fontSize: '12px', color: 'var(--text)' }}>
-            B2B Multi-Tenant Platform Administration
+            {user?.role === 'SYSTEM_OWNER'
+              ? 'B2B Multi-Tenant Platform Administration'
+              : 'Business Management Console'}
           </p>
         </div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-h)' }}>
-            {user?.name || 'System Owner'}
+          <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-h)', whiteSpace: 'nowrap' }}>
+            {user?.name || (user?.role === 'SYSTEM_OWNER' ? 'System Owner' : 'Business Admin')}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text)' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text)', whiteSpace: 'nowrap' }}>
             {user?.email}
           </div>
         </div>
@@ -80,6 +82,8 @@ export default function Header({ user, onLogout }) {
             background: 'var(--bg)',
             color: '#dc2626',
             cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
             transition: 'all 0.15s ease',
           }}
           title="Sign out of platform console"
