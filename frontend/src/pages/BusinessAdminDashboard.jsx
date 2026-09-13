@@ -1428,6 +1428,7 @@ export default function BusinessAdminDashboard({ user, onLogout }) {
         {/* Tab 3 & 4: Availability & Hours / Slot Preview Workspace */}
         {(activeTab === 'availability' || activeTab === 'slots') && (
           <AvailabilityManager
+            activeTab={activeTab}
             user={user}
             businessInfo={businessInfo}
             services={services}

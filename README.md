@@ -8,7 +8,7 @@ The application is designed around **multi-tenancy, secure role-based access con
 
 ## Live Demo
 
-**Production URL:** `https://slotify.onrender.com`
+**Production URL:** https://slotify-2mip.onrender.com/
 
 > If the production URL changes, update this section before submission.
 
@@ -1226,8 +1226,7 @@ The backend enforces role-based authorization and tenant isolation, while the bo
 **GitHub Repository:**  
 https://github.com/khushiiish/Slotify
 
-**Live Demo:**  
-https://slotify.onrender.com
+**Live Demo:**  https://slotify-2mip.onrender.com/
 
 **Demo / Walkthrough Video:**  
 _Add final video link here_

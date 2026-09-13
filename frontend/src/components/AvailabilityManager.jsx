@@ -45,7 +45,11 @@ const SHORT_DAYS_MAP = {
  * Converts 24-hour time "HH:mm" to 12-hour "hh:mm AM/PM"
  */
 const formatTime12 = (timeStr) => {
-  if (!timeStr || typeof timeStr !== 'string') return '';
+  if (!timeStr) return '';
+  if (typeof timeStr === 'object') {
+    timeStr = timeStr.localStartTime || timeStr.time || '';
+  }
+  if (typeof timeStr !== 'string') return '';
   const parts = timeStr.split(':');
   if (parts.length < 2) return timeStr;
   const h = parseInt(parts[0], 10);
@@ -56,6 +60,7 @@ const formatTime12 = (timeStr) => {
 };
 
 export default function AvailabilityManager({
+  activeTab = 'availability',
   user,
   businessInfo,
   services = [],
@@ -202,184 +207,380 @@ export default function AvailabilityManager({
 
   const timezone = businessInfo?.timezone || 'Asia/Kolkata';
 
-  return (
-    <div id="availability-manager" className="space-y-8 animate-in fade-in duration-200">
-      {/* ======================================================== */}
-      {/* 1. HEADER & TIMEZONE CONTEXT                             */}
-      {/* ======================================================== */}
-      <div
+  // ========================================================
+  // SLOT PREVIEW WORKSPACE COMPONENT
+  // ========================================================
+  const slotPreviewWorkspaceJSX = (
+    <div
+      id="slot-preview-section"
+      style={{
+        background: 'var(--code-bg)',
+        border: '1px solid var(--border)',
+        borderRadius: '12px',
+        padding: '20px 24px',
+      }}
+    >
+      <div style={{ marginBottom: '18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Sparkles size={20} color="var(--accent)" />
+          <h2
+            style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: 'var(--text-h)',
+              margin: 0,
+            }}
+          >
+            Slot Preview
+          </h2>
+        </div>
+        <p style={{ fontSize: '13px', color: 'var(--text)', margin: '4px 0 0' }}>
+          Preview available appointment slots before customers book. Tests real-time engine calculation
+          with 15-minute start intervals, service durations, working hours, and conflict checks.
+        </p>
+      </div>
+
+      {/* Controls Form */}
+      <form
+        onSubmit={handleExecuteSlotPreview}
         style={{
-          background: 'var(--code-bg)',
+          background: 'var(--bg)',
           border: '1px solid var(--border)',
-          borderRadius: '12px',
-          padding: '20px 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
+          borderRadius: '10px',
+          padding: '16px',
+          marginBottom: '20px',
         }}
       >
         <div
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            flexWrap: 'wrap',
-            gap: '16px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '14px',
+            alignItems: 'flex-end',
           }}
         >
+          {/* Service */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '8px',
-                  background: 'var(--accent-bg)',
-                  color: 'var(--accent)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Calendar size={20} />
-              </div>
-              <h1
-                style={{
-                  fontSize: '22px',
-                  fontWeight: 700,
-                  color: 'var(--text-h)',
-                  margin: 0,
-                  letterSpacing: '-0.3px',
-                }}
-              >
-                Availability & Hours
-              </h1>
-            </div>
-            <p
+            <label
+              htmlFor="preview-service-select"
+              style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-h)', marginBottom: '4px' }}
+            >
+              Service (Required)
+            </label>
+            <select
+              id="preview-service-select"
+              value={previewServiceId}
+              onChange={(e) => setPreviewServiceId(e.target.value)}
+              required
               style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: 'var(--code-bg)',
+                color: 'var(--text-h)',
                 fontSize: '13px',
-                color: 'var(--text)',
-                margin: '6px 0 0',
-                maxWidth: '620px',
-                lineHeight: 1.5,
+                boxSizing: 'border-box',
               }}
             >
-              Set when your business and staff are available for appointments. Manage recurring weekly
-              hours, individual staff overrides, and holiday closures.
-            </p>
+              <option value="">-- Select a Service --</option>
+              {services.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name} ({s.durationMinutes}m) {s.status !== 'ACTIVE' ? `[${s.status}]` : ''}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Action buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              id="add-availability-btn"
-              onClick={handleOpenCreateAvailability}
+          {/* Date */}
+          <div>
+            <label
+              htmlFor="preview-date-input"
+              style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-h)', marginBottom: '4px' }}
+            >
+              Date (Required)
+            </label>
+            <input
+              id="preview-date-input"
+              type="date"
+              value={previewDate}
+              onChange={(e) => setPreviewDate(e.target.value)}
+              required
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '9px 16px',
-                borderRadius: '8px',
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: 'var(--code-bg)',
+                color: 'var(--text-h)',
+                fontSize: '13px',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          {/* Staff */}
+          <div>
+            <label
+              htmlFor="preview-staff-select"
+              style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-h)', marginBottom: '4px' }}
+            >
+              Staff Member (Optional)
+            </label>
+            <select
+              id="preview-staff-select"
+              value={previewStaffId}
+              onChange={(e) => setPreviewStaffId(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: 'var(--code-bg)',
+                color: 'var(--text-h)',
+                fontSize: '13px',
+                boxSizing: 'border-box',
+              }}
+            >
+              <option value="">👥 Any Eligible Staff</option>
+              {staff
+                .filter((st) => st.status === 'ACTIVE')
+                .map((st) => (
+                  <option key={st._id} value={st._id}>
+                    👤 {st.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          {/* Submit */}
+          <div>
+            <button
+              type="submit"
+              id="preview-slots-btn"
+              disabled={previewLoading || !previewServiceId || !previewDate}
+              style={{
+                width: '100%',
+                padding: '10px 18px',
+                borderRadius: '6px',
                 border: 'none',
                 background: 'var(--accent)',
                 color: '#fff',
                 fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(166, 51, 255, 0.25)',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <Plus size={16} />
-              Add Working Window
-            </button>
-            <button
-              type="button"
-              id="add-blocked-date-btn"
-              onClick={handleOpenCreateBlockedDate}
-              style={{
-                display: 'inline-flex',
+                fontWeight: 700,
+                cursor: previewLoading ? 'not-allowed' : 'pointer',
+                display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '8px',
-                padding: '9px 16px',
-                borderRadius: '8px',
-                border: '1px solid rgba(244, 63, 94, 0.35)',
-                background: 'rgba(244, 63, 94, 0.08)',
-                color: '#fb7185',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
             >
-              <CalendarX size={15} />
-              Block Date
+              {previewLoading ? (
+                <>
+                  <RefreshCw size={14} className="spin" /> Calculating...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} /> Calculate Available Slots
+                </>
+              )}
             </button>
-            {onRefresh && (
-              <button
-                type="button"
-                onClick={onRefresh}
+          </div>
+        </div>
+      </form>
+
+      {/* Results Area */}
+      {previewError && (
+        <div
+          id="slot-preview-error"
+          style={{
+            padding: '12px 16px',
+            borderRadius: '8px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+            color: '#ef4444',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <AlertCircle size={16} />
+          <span>{previewError}</span>
+        </div>
+      )}
+
+      {previewSlotsResult && !previewError && (
+        <div id="slot-preview-results" style={{ marginTop: '16px' }}>
+          {/* Header info badge */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+              padding: '12px 16px',
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              marginBottom: '16px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '13px' }}>
+              <div>
+                <span style={{ color: 'var(--text)', fontSize: '11px', display: 'block' }}>SERVICE</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-h)' }}>
+                  {previewSlotsResult.service?.name} ({previewSlotsResult.service?.durationMinutes}m)
+                </span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text)', fontSize: '11px', display: 'block' }}>DATE</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-h)' }}>
+                  {previewSlotsResult.date}
+                </span>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text)', fontSize: '11px', display: 'block' }}>TIMEZONE</span>
+                <span style={{ fontWeight: 700, color: 'var(--accent)' }}>
+                  {previewSlotsResult.timezone || timezone}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <span
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg)',
-                  color: 'var(--text)',
-                  fontSize: '13px',
-                  cursor: 'pointer',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  background:
+                    (previewSlotsResult.slots || []).length > 0
+                      ? 'rgba(16, 185, 129, 0.15)'
+                      : 'rgba(239, 68, 68, 0.15)',
+                  color: (previewSlotsResult.slots || []).length > 0 ? '#10b981' : '#ef4444',
+                  fontWeight: 700,
+                  fontSize: '12px',
                 }}
-                title="Refresh availability data"
               >
-                <RefreshCw size={14} />
-              </button>
-            )}
+                {(previewSlotsResult.slots || []).length > 0 ? (
+                  <CheckCircle2 size={13} />
+                ) : (
+                  <XCircle size={13} />
+                )}
+                {(previewSlotsResult.slots || []).length} Slots Available
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Timezone banner */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '12px',
-            padding: '10px 14px',
-            background: 'var(--bg)',
-            border: '1px solid var(--border)',
-            borderRadius: '8px',
-            fontSize: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-h)' }}>
-            <Globe size={15} color="var(--accent)" />
-            <span style={{ fontWeight: 600 }}>Business Timezone:</span>
-            <code
+          {/* Generated Slots Grid */}
+          {(previewSlotsResult.slots || []).length === 0 ? (
+            <div
               style={{
-                padding: '2px 8px',
-                borderRadius: '4px',
-                background: 'var(--accent-bg)',
-                color: 'var(--accent)',
-                fontWeight: 700,
-                fontSize: '12px',
+                padding: '36px 20px',
+                textAlign: 'center',
+                background: 'var(--bg)',
+                border: '1px dashed var(--border)',
+                borderRadius: '8px',
               }}
             >
-              {timezone}
-            </code>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text)' }}>
-            <Info size={13} style={{ opacity: 0.7 }} />
-            <span>Availability and appointment slot times are calculated strictly in the business timezone.</span>
-          </div>
-        </div>
-      </div>
+              <CalendarX size={32} color="var(--text)" style={{ opacity: 0.3, marginBottom: '8px' }} />
+              <h4 style={{ margin: '0 0 6px', color: 'var(--text-h)', fontSize: '15px' }}>
+                No available slots for this date
+              </h4>
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text)', maxWidth: '480px', marginInline: 'auto' }}>
+                The business may be closed on this day, working hours might be paused, the date might be blocked, or staff schedules are fully booked.
+              </p>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                gap: '10px',
+              }}
+            >
+              {(previewSlotsResult.slots || []).map((slot, idx) => {
+                const startTimeStr = typeof slot === 'string' ? slot : (slot.localStartTime || slot.time || '');
+                const endTimeStr = typeof slot === 'object' ? (slot.localEndTime || '') : '';
+                const staffName = typeof slot === 'object' ? slot.staffName : '';
+                const displayTime = formatTime12(startTimeStr);
+                const displayEndTime = endTimeStr ? formatTime12(endTimeStr) : '';
 
+                return (
+                  <div
+                    key={idx}
+                    id={`preview-slot-${idx}`}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      background: 'var(--bg)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-h)',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      textAlign: 'center',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Clock size={13} color="var(--accent)" />
+                      <span style={{ fontWeight: 700, color: 'var(--text-h)' }}>
+                        {displayTime || startTimeStr || 'Available'}
+                      </span>
+                    </div>
+                    {displayEndTime && (
+                      <div style={{ fontSize: '11px', color: 'var(--text)', fontWeight: 500 }}>
+                        until {displayEndTime}
+                      </div>
+                    )}
+                    {staffName && (
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          color: 'var(--accent)',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          marginTop: '2px',
+                        }}
+                      >
+                        <span>👤</span>
+                        <span>{staffName}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  // If user clicked the dedicated "Slot Preview" tab in dashboard
+  if (activeTab === 'slots') {
+    return (
+      <div id="availability-manager" className="space-y-8 animate-in fade-in duration-200">
+        {slotPreviewWorkspaceJSX}
+      </div>
+    );
+  }
+
+  return (
+    <div id="availability-manager" className="space-y-8 animate-in fade-in duration-200">
       {/* ======================================================== */}
-      {/* 2. SCHEDULE SCOPE FILTER BAR                             */}
+      {/* 1. SCHEDULE SCOPE FILTER BAR                             */}
       {/* ======================================================== */}
       <div
         style={{
@@ -519,9 +720,39 @@ export default function AvailabilityManager({
           })}
         </div>
 
-        {/* Override rule explanation note */}
-        <div style={{ fontSize: '11px', color: 'var(--text)', fontStyle: 'italic' }}>
-          Staff-specific hours override business default for that weekday.
+        {/* Timezone & Override rule note */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 10px',
+              borderRadius: '20px',
+              background: 'var(--code-bg)',
+              border: '1px solid var(--border)',
+              fontSize: '12px',
+              color: 'var(--text-h)',
+            }}
+          >
+            <Globe size={13} color="var(--accent)" />
+            <span style={{ fontWeight: 600 }}>Timezone:</span>
+            <code
+              style={{
+                padding: '1px 6px',
+                borderRadius: '4px',
+                background: 'var(--accent-bg)',
+                color: 'var(--accent)',
+                fontWeight: 700,
+                fontSize: '11px',
+              }}
+            >
+              {timezone}
+            </code>
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text)', fontStyle: 'italic' }}>
+            Staff-specific hours override business default for that weekday.
+          </div>
         </div>
       </div>
 
@@ -1279,329 +1510,8 @@ export default function AvailabilityManager({
         )}
       </div>
 
-      {/* ======================================================== */}
-      {/* 5. SLOT GENERATION ENGINE PREVIEW                        */}
-      {/* ======================================================== */}
-      <div
-        id="slot-preview-section"
-        style={{
-          background: 'var(--code-bg)',
-          border: '1px solid var(--border)',
-          borderRadius: '12px',
-          padding: '20px 24px',
-        }}
-      >
-        <div style={{ marginBottom: '18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sparkles size={20} color="var(--accent)" />
-            <h2
-              style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: 'var(--text-h)',
-                margin: 0,
-              }}
-            >
-              Slot Preview
-            </h2>
-          </div>
-          <p style={{ fontSize: '13px', color: 'var(--text)', margin: '4px 0 0' }}>
-            Preview available appointment slots before customers book. Tests real-time engine calculation
-            with 15-minute start intervals, service durations, working hours, and conflict checks.
-          </p>
-        </div>
-
-        {/* Controls Form */}
-        <form
-          onSubmit={handleExecuteSlotPreview}
-          style={{
-            background: 'var(--bg)',
-            border: '1px solid var(--border)',
-            borderRadius: '10px',
-            padding: '16px',
-            marginBottom: '20px',
-          }}
-        >
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '14px',
-              alignItems: 'flex-end',
-            }}
-          >
-            {/* Service */}
-            <div>
-              <label
-                htmlFor="preview-service-select"
-                style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-h)', marginBottom: '4px' }}
-              >
-                Service (Required)
-              </label>
-              <select
-                id="preview-service-select"
-                value={previewServiceId}
-                onChange={(e) => setPreviewServiceId(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--code-bg)',
-                  color: 'var(--text-h)',
-                  fontSize: '13px',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <option value="">-- Select a Service --</option>
-                {services.map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {s.name} ({s.durationMinutes}m) {s.status !== 'ACTIVE' ? `[${s.status}]` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Date */}
-            <div>
-              <label
-                htmlFor="preview-date-input"
-                style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-h)', marginBottom: '4px' }}
-              >
-                Date (Required)
-              </label>
-              <input
-                id="preview-date-input"
-                type="date"
-                value={previewDate}
-                onChange={(e) => setPreviewDate(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--code-bg)',
-                  color: 'var(--text-h)',
-                  fontSize: '13px',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-
-            {/* Staff */}
-            <div>
-              <label
-                htmlFor="preview-staff-select"
-                style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-h)', marginBottom: '4px' }}
-              >
-                Staff Member (Optional)
-              </label>
-              <select
-                id="preview-staff-select"
-                value={previewStaffId}
-                onChange={(e) => setPreviewStaffId(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--code-bg)',
-                  color: 'var(--text-h)',
-                  fontSize: '13px',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <option value="">👥 Any Eligible Staff</option>
-                {staff
-                  .filter((st) => st.status === 'ACTIVE')
-                  .map((st) => (
-                    <option key={st._id} value={st._id}>
-                      👤 {st.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            {/* Submit */}
-            <div>
-              <button
-                type="submit"
-                id="preview-slots-btn"
-                disabled={previewLoading || !previewServiceId || !previewDate}
-                style={{
-                  width: '100%',
-                  padding: '10px 18px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  background: 'var(--accent)',
-                  color: '#fff',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  cursor: previewLoading ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {previewLoading ? (
-                  <>
-                    <RefreshCw size={14} className="spin" /> Calculating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={14} /> Calculate Available Slots
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </form>
-
-        {/* Results Area */}
-        {previewError && (
-          <div
-            id="slot-preview-error"
-            style={{
-              padding: '12px 16px',
-              borderRadius: '8px',
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.25)',
-              color: '#ef4444',
-              fontSize: '13px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            <AlertCircle size={16} />
-            <span>{previewError}</span>
-          </div>
-        )}
-
-        {previewSlotsResult && !previewError && (
-          <div id="slot-preview-results" style={{ marginTop: '16px' }}>
-            {/* Header info badge */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '12px',
-                padding: '12px 16px',
-                background: 'var(--bg)',
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                marginBottom: '16px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '13px' }}>
-                <div>
-                  <span style={{ color: 'var(--text)', fontSize: '11px', display: 'block' }}>SERVICE</span>
-                  <span style={{ fontWeight: 700, color: 'var(--text-h)' }}>
-                    {previewSlotsResult.service?.name} ({previewSlotsResult.service?.durationMinutes}m)
-                  </span>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text)', fontSize: '11px', display: 'block' }}>DATE</span>
-                  <span style={{ fontWeight: 700, color: 'var(--text-h)' }}>
-                    {previewSlotsResult.date}
-                  </span>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text)', fontSize: '11px', display: 'block' }}>TIMEZONE</span>
-                  <span style={{ fontWeight: 700, color: 'var(--accent)' }}>
-                    {previewSlotsResult.timezone || timezone}
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    background:
-                      (previewSlotsResult.slots || []).length > 0
-                        ? 'rgba(16, 185, 129, 0.15)'
-                        : 'rgba(239, 68, 68, 0.15)',
-                    color: (previewSlotsResult.slots || []).length > 0 ? '#10b981' : '#ef4444',
-                    fontWeight: 700,
-                    fontSize: '12px',
-                  }}
-                >
-                  {(previewSlotsResult.slots || []).length > 0 ? (
-                    <CheckCircle2 size={13} />
-                  ) : (
-                    <XCircle size={13} />
-                  )}
-                  {(previewSlotsResult.slots || []).length} Slots Available
-                </span>
-              </div>
-            </div>
-
-            {/* Generated Slots Grid */}
-            {(previewSlotsResult.slots || []).length === 0 ? (
-              <div
-                style={{
-                  padding: '36px 20px',
-                  textAlign: 'center',
-                  background: 'var(--bg)',
-                  border: '1px dashed var(--border)',
-                  borderRadius: '8px',
-                }}
-              >
-                <CalendarX size={32} color="var(--text)" style={{ opacity: 0.3, marginBottom: '8px' }} />
-                <h4 style={{ margin: '0 0 6px', color: 'var(--text-h)', fontSize: '15px' }}>
-                  No available slots for this date
-                </h4>
-                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text)', maxWidth: '480px', marginInline: 'auto' }}>
-                  The business may be closed on this day, working hours might be paused, the date might be blocked, or staff schedules are fully booked.
-                </p>
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
-                  gap: '8px',
-                }}
-              >
-                {(previewSlotsResult.slots || []).map((slotTime, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      padding: '8px 10px',
-                      borderRadius: '6px',
-                      background: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      color: 'var(--text-h)',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      textAlign: 'center',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <Clock size={12} color="var(--accent)" />
-                    <span>{formatTime12(slotTime)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {/* 4. SLOT PREVIEW WORKSPACE AT BOTTOM OF AVAILABILITY */}
+      {slotPreviewWorkspaceJSX}
     </div>
   );
 }
