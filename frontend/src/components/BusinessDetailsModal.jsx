@@ -17,7 +17,7 @@ export default function BusinessDetailsModal({
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(0, 0, 0, 0.55)',
+      background: 'rgba(8, 8, 12, 0.35)',
       backdropFilter: 'blur(3px)',
       display: 'flex',
       alignItems: 'center',

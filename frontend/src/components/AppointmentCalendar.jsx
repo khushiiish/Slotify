@@ -319,7 +319,7 @@ export default function AppointmentCalendar({
               color: 'var(--accent)',
               padding: '3px 8px',
               borderRadius: '12px',
-              background: 'rgba(99, 102, 241, 0.1)',
+              background: 'var(--accent-bg)',
               fontWeight: 600,
             }}
           >
@@ -411,10 +411,10 @@ export default function AppointmentCalendar({
                     padding: '8px',
                     minHeight: '90px',
                     background: isToday
-                      ? 'rgba(99, 102, 241, 0.05)'
+                      ? 'rgba(166, 51, 255, 0.06)'
                       : dayObj.isCurrentMonth
                       ? 'transparent'
-                      : 'rgba(0, 0, 0, 0.1)',
+                      : 'rgba(0, 0, 0, 0.03)',
                     opacity: dayObj.isCurrentMonth ? 1 : 0.45,
                     display: 'flex',
                     flexDirection: 'column',
@@ -430,7 +430,7 @@ export default function AppointmentCalendar({
                         color: isToday ? 'var(--accent)' : 'var(--text-h)',
                         padding: isToday ? '2px 6px' : '0',
                         borderRadius: isToday ? '10px' : '0',
-                        background: isToday ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+                        background: isToday ? 'rgba(166, 51, 255, 0.15)' : 'transparent',
                       }}
                     >
                       {dayObj.dayNum}
@@ -560,7 +560,7 @@ export default function AppointmentCalendar({
                   style={{
                     borderRight: '1px solid var(--border)',
                     padding: '10px 8px',
-                    background: isToday ? 'rgba(99, 102, 241, 0.05)' : 'transparent',
+                    background: isToday ? 'rgba(166, 51, 255, 0.06)' : 'transparent',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '8px',

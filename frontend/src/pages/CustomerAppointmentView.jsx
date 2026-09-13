@@ -340,9 +340,10 @@ export default function CustomerAppointmentView({ appointmentId, token, onNaviga
             position: 'fixed',
             top: 0,
             left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.75)',
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(8, 8, 12, 0.35)',
+            backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -352,13 +353,13 @@ export default function CustomerAppointmentView({ appointmentId, token, onNaviga
         >
           <div
             style={{
-              backgroundColor: 'var(--code-bg)',
+              backgroundColor: 'var(--bg)',
               border: '1px solid var(--border)',
               borderRadius: '14px',
               padding: '24px',
               maxWidth: '440px',
               width: '100%',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
+              boxShadow: '0 20px 25px -5px rgba(8, 8, 12, 0.1), 0 8px 10px -6px rgba(8, 8, 12, 0.05)',
             }}
           >
             <h3 style={{ margin: '0 0 10px', fontSize: '18px', color: 'var(--text-h)', fontWeight: 600 }}>

@@ -87,7 +87,7 @@ export default function AppointmentDetailsModal({
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        backgroundColor: 'rgba(8, 8, 12, 0.35)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -107,7 +107,7 @@ export default function AppointmentDetailsModal({
           maxWidth: '560px',
           maxHeight: '90vh',
           overflowY: 'auto',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
+          boxShadow: '0 20px 25px -5px rgba(8, 8, 12, 0.1), 0 8px 10px -6px rgba(8, 8, 12, 0.05)',
           padding: '24px',
         }}
         onClick={(e) => e.stopPropagation()}

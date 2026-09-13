@@ -77,32 +77,32 @@ export default function AnalyticsView({ business }) {
       const data = payload[0].payload;
       return (
         <div style={{
-          backgroundColor: '#0f172a',
-          border: '1px solid #334155',
+          backgroundColor: '#FFFFFF',
+          border: '1px solid var(--border)',
           borderRadius: '8px',
           padding: '10px 14px',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-          color: '#f8fafc',
+          boxShadow: 'var(--shadow)',
+          color: 'var(--text-h)',
           fontSize: '13px',
         }}>
-          <div style={{ fontWeight: 700, marginBottom: '6px', color: '#94a3b8' }}>
+          <div style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--text-h)' }}>
             {data.date}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', marginBottom: '3px' }}>
-            <span style={{ color: '#60a5fa' }}>Total:</span>
-            <span style={{ fontWeight: 700 }}>{data.count}</span>
+            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Total:</span>
+            <span style={{ fontWeight: 700, color: 'var(--text-h)' }}>{data.count}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', marginBottom: '3px' }}>
-            <span style={{ color: '#34d399' }}>Completed:</span>
-            <span>{data.completed}</span>
+            <span style={{ color: '#16a34a' }}>Completed:</span>
+            <span style={{ color: 'var(--text-h)' }}>{data.completed}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', marginBottom: '3px' }}>
-            <span style={{ color: '#f87171' }}>Cancelled:</span>
-            <span>{data.cancelled}</span>
+            <span style={{ color: '#dc2626' }}>Cancelled:</span>
+            <span style={{ color: 'var(--text-h)' }}>{data.cancelled}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-            <span style={{ color: '#fbbf24' }}>No-Show:</span>
-            <span>{data.noShow}</span>
+            <span style={{ color: '#d97706' }}>No-Show:</span>
+            <span style={{ color: 'var(--text-h)' }}>{data.noShow}</span>
           </div>
         </div>
       );
@@ -394,27 +394,27 @@ export default function AnalyticsView({ business }) {
                 <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#A633FF" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#A633FF" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E7E4DC" opacity={0.8} />
                   <XAxis
                     dataKey="date"
-                    stroke="#94a3b8"
+                    stroke="#667085"
                     fontSize={11}
                     tickFormatter={(val) => {
                       const parts = val.split('-');
                       return `${parts[1]}/${parts[2]}`;
                     }}
                   />
-                  <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} />
+                  <YAxis stroke="#667085" fontSize={11} allowDecimals={false} />
                   <Tooltip content={<CustomTrendTooltip />} />
                   <Area
                     type="monotone"
                     dataKey="count"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
+                    stroke="#A633FF"
+                    strokeWidth={2.5}
                     fillOpacity={1}
                     fill="url(#colorCount)"
                   />
@@ -539,10 +539,10 @@ export default function AnalyticsView({ business }) {
                       <td style={{ padding: '10px 4px', textAlign: 'center', fontWeight: 700 }}>
                         {srv.total}
                       </td>
-                      <td style={{ padding: '10px 4px', textAlign: 'center', color: '#34d399' }}>
+                      <td style={{ padding: '10px 4px', textAlign: 'center', color: '#16a34a' }}>
                         {srv.completed}
                       </td>
-                      <td style={{ padding: '10px 4px', textAlign: 'center', color: '#f87171' }}>
+                      <td style={{ padding: '10px 4px', textAlign: 'center', color: '#dc2626' }}>
                         {srv.cancelled}
                       </td>
                     </tr>
@@ -595,10 +595,10 @@ export default function AnalyticsView({ business }) {
                       <td style={{ padding: '10px 4px', textAlign: 'center', fontWeight: 700 }}>
                         {st.total}
                       </td>
-                      <td style={{ padding: '10px 4px', textAlign: 'center', color: '#34d399' }}>
+                      <td style={{ padding: '10px 4px', textAlign: 'center', color: '#16a34a' }}>
                         {st.completed}
                       </td>
-                      <td style={{ padding: '10px 4px', textAlign: 'center', color: '#fbbf24' }}>
+                      <td style={{ padding: '10px 4px', textAlign: 'center', color: '#d97706' }}>
                         {st.noShow}
                       </td>
                     </tr>

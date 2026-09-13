@@ -113,9 +113,12 @@ export default function AvailabilityModal({
       id="availability-modal-backdrop"
       style={{
         position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        backdropFilter: 'blur(4px)',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(8, 8, 12, 0.35)',
+        backdropFilter: 'blur(3px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -132,7 +135,7 @@ export default function AvailabilityModal({
           border: '1px solid var(--border)',
           width: '100%',
           maxWidth: '520px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+          boxShadow: '0 20px 25px -5px rgba(8, 8, 12, 0.1), 0 8px 10px -6px rgba(8, 8, 12, 0.05)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -158,7 +161,7 @@ export default function AvailabilityModal({
                 width: '38px',
                 height: '38px',
                 borderRadius: '8px',
-                background: 'rgba(99, 102, 241, 0.15)',
+                background: 'var(--accent-bg)',
                 color: 'var(--accent)',
                 display: 'flex',
                 alignItems: 'center',
@@ -486,7 +489,7 @@ export default function AvailabilityModal({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: '0 2px 8px rgba(99, 102, 241, 0.25)',
+                boxShadow: '0 2px 8px rgba(166, 51, 255, 0.25)',
                 transition: 'all 0.15s ease',
               }}
             >
