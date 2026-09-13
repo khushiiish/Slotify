@@ -2,8 +2,8 @@ import dns from 'node:dns';
 import mongoose from 'mongoose';
 import { env } from './env.js';
 
-// Configure reliable DNS servers to avoid SRV query refusal on local network routers
-if (env.MONGO_URI.startsWith('mongodb+srv://')) {
+// Configure reliable DNS servers to avoid SRV query refusal on local network routers (Windows dev only)
+if (process.env.NODE_ENV !== 'production' && process.platform === 'win32' && env.MONGO_URI.startsWith('mongodb+srv://')) {
   try {
     dns.setServers(['8.8.8.8', '1.1.1.1']);
   } catch {
@@ -18,7 +18,10 @@ if (env.MONGO_URI.startsWith('mongodb+srv://')) {
  */
 export const connectDatabase = async () => {
   try {
-    const conn = await mongoose.connect(env.MONGO_URI);
+    const conn = await mongoose.connect(env.MONGO_URI, {
+      serverSelectionTimeoutMS: 15000,
+      connectTimeoutMS: 15000,
+    });
     // Log safely without exposing user/password
     const host = conn.connection.host || 'unknown-host';
     const dbName = conn.connection.name || 'default';

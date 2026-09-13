@@ -7,21 +7,23 @@ let server;
 
 const startServer = async () => {
   try {
-    // 1. Connect to MongoDB
-    await connectDatabase();
-
-    // 2. Idempotently bootstrap database & dedicated evaluator accounts
-    if (process.env.SEED_ON_START !== 'false') {
-      await seedDatabase();
-    }
-
-    // 3. Start Express server listener (bind to 0.0.0.0 for Render compatibility)
+    // 1. Immediately bind Express server listener so Render detects open port in <1s
     server = app.listen(env.PORT, '0.0.0.0', () => {
       console.log(`[Server] Slotify API is running on port ${env.PORT} in ${env.NODE_ENV} mode`);
     });
+
+    // 2. Connect to MongoDB
+    await connectDatabase();
+
+    // 3. Idempotently bootstrap database & dedicated evaluator accounts
+    if (process.env.SEED_ON_START !== 'false') {
+      await seedDatabase();
+    }
   } catch (error) {
-    console.error('[Server] Failed to start server due to database connection error:', error.message);
-    process.exit(1);
+    console.error('[Server] Startup error:', error.message);
+    if (!server) {
+      process.exit(1);
+    }
   }
 };
 
