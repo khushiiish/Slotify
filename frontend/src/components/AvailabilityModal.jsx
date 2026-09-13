@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Calendar, Clock, User, CheckCircle2 } from 'lucide-react';
+import { X, Calendar, Clock, User, CheckCircle2, Building2 } from 'lucide-react';
 
 const DAYS_OF_WEEK = [
   { value: 1, label: 'Monday' },
@@ -10,6 +10,20 @@ const DAYS_OF_WEEK = [
   { value: 6, label: 'Saturday' },
   { value: 0, label: 'Sunday' },
 ];
+
+/**
+ * Converts 24-hour time "HH:mm" to 12-hour "hh:mm AM/PM"
+ */
+const formatTime12 = (timeStr) => {
+  if (!timeStr || typeof timeStr !== 'string') return '';
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+  const h = parseInt(parts[0], 10);
+  const m = parts[1];
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${m} ${period}`;
+};
 
 export default function AvailabilityModal({
   isOpen,
@@ -97,54 +111,137 @@ export default function AvailabilityModal({
   return (
     <div
       id="availability-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '16px',
+        boxSizing: 'border-box',
+      }}
     >
       <div
         id="availability-modal-content"
-        className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
+        style={{
+          background: 'var(--bg)',
+          borderRadius: '12px',
+          border: '1px solid var(--border)',
+          width: '100%',
+          maxWidth: '520px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          textAlign: 'left',
+          boxSizing: 'border-box',
+          maxHeight: '90vh',
+        }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800 bg-slate-900/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-              <Calendar className="w-5 h-5" />
+        <div
+          style={{
+            padding: '18px 24px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'var(--code-bg)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '8px',
+                background: 'rgba(99, 102, 241, 0.15)',
+                color: 'var(--accent)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Calendar size={20} />
             </div>
             <div>
-              <h2 id="availability-modal-title" className="text-lg font-semibold text-white">
+              <h2
+                id="availability-modal-title"
+                style={{
+                  margin: 0,
+                  fontSize: '17px',
+                  fontWeight: 700,
+                  color: 'var(--text-h)',
+                  letterSpacing: '-0.2px',
+                }}
+              >
                 {isEditing ? 'Edit Availability Window' : 'Add Availability Window'}
               </h2>
-              <p className="text-xs text-slate-400">
+              <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--text)' }}>
                 Configure weekly working hours for the business or specific staff
               </p>
             </div>
           </div>
           <button
+            type="button"
             id="availability-close-btn"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text)',
+              cursor: 'pointer',
+              padding: '6px',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease',
+            }}
+            title="Close dialog"
           >
-            <X className="w-5 h-5" />
+            <X size={20} />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} style={{ padding: '24px', overflowY: 'auto' }}>
           {error && (
             <div
               id="availability-modal-error"
-              className="p-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl"
+              style={{
+                marginBottom: '18px',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#ef4444',
+                fontSize: '13px',
+              }}
             >
               {error}
             </div>
           )}
 
           {/* Scope: Business vs Staff */}
-          <div>
+          <div style={{ marginBottom: '18px' }}>
             <label
               htmlFor="availability-staff-select"
-              className="flex items-center gap-2 text-xs font-medium text-slate-300 mb-2"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--text-h)',
+                marginBottom: '6px',
+              }}
             >
-              <User className="w-3.5 h-3.5 text-indigo-400" />
+              <User size={14} color="var(--accent)" />
               Schedule Scope
             </label>
             <select
@@ -152,7 +249,16 @@ export default function AvailabilityModal({
               name="staffId"
               value={formData.staffId}
               onChange={handleChange}
-              className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                background: 'var(--bg)',
+                color: 'var(--text-h)',
+                fontSize: '13px',
+                boxSizing: 'border-box',
+              }}
             >
               <option value="">🏢 Business-Wide (Default Fallback)</option>
               {staffList.map((st) => (
@@ -161,18 +267,26 @@ export default function AvailabilityModal({
                 </option>
               ))}
             </select>
-            <p className="text-xs text-slate-500 mt-1">
+            <p style={{ margin: '5px 0 0', fontSize: '11px', color: 'var(--text)' }}>
               Staff-specific schedules override business working hours for that weekday.
             </p>
           </div>
 
           {/* Day of Week */}
-          <div>
+          <div style={{ marginBottom: '18px' }}>
             <label
               htmlFor="availability-day-select"
-              className="flex items-center gap-2 text-xs font-medium text-slate-300 mb-2"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--text-h)',
+                marginBottom: '6px',
+              }}
             >
-              <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+              <Calendar size={14} color="var(--accent)" />
               Day of Week
             </label>
             <select
@@ -180,7 +294,16 @@ export default function AvailabilityModal({
               name="dayOfWeek"
               value={formData.dayOfWeek}
               onChange={handleChange}
-              className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                background: 'var(--bg)',
+                color: 'var(--text-h)',
+                fontSize: '13px',
+                boxSizing: 'border-box',
+              }}
             >
               {DAYS_OF_WEEK.map((d) => (
                 <option key={d.value} value={d.value}>
@@ -191,13 +314,28 @@ export default function AvailabilityModal({
           </div>
 
           {/* Start and End Times */}
-          <div className="grid grid-cols-2 gap-4">
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '16px',
+              marginBottom: '18px',
+            }}
+          >
             <div>
               <label
                 htmlFor="availability-start-time"
-                className="flex items-center gap-2 text-xs font-medium text-slate-300 mb-2"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: 'var(--text-h)',
+                  marginBottom: '6px',
+                }}
               >
-                <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                <Clock size={14} color="var(--accent)" />
                 Start Time (24h)
               </label>
               <input
@@ -207,15 +345,36 @@ export default function AvailabilityModal({
                 value={formData.startTime}
                 onChange={handleChange}
                 required
-                className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg)',
+                  color: 'var(--text-h)',
+                  fontSize: '13px',
+                  boxSizing: 'border-box',
+                }}
               />
+              <span style={{ display: 'block', fontSize: '11px', color: 'var(--text)', marginTop: '4px' }}>
+                {formatTime12(formData.startTime)}
+              </span>
             </div>
+
             <div>
               <label
                 htmlFor="availability-end-time"
-                className="flex items-center gap-2 text-xs font-medium text-slate-300 mb-2"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: 'var(--text-h)',
+                  marginBottom: '6px',
+                }}
               >
-                <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                <Clock size={14} color="var(--accent)" />
                 End Time (24h)
               </label>
               <input
@@ -225,33 +384,88 @@ export default function AvailabilityModal({
                 value={formData.endTime}
                 onChange={handleChange}
                 required
-                className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg)',
+                  color: 'var(--text-h)',
+                  fontSize: '13px',
+                  boxSizing: 'border-box',
+                }}
               />
+              <span style={{ display: 'block', fontSize: '11px', color: 'var(--text)', marginTop: '4px' }}>
+                {formatTime12(formData.endTime)}
+              </span>
             </div>
           </div>
 
           {/* Active Status */}
-          <div className="flex items-center gap-3 pt-2">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '12px 14px',
+              background: 'var(--code-bg)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              marginBottom: '20px',
+            }}
+          >
             <input
               id="availability-active-checkbox"
               type="checkbox"
               name="isActive"
               checked={formData.isActive}
               onChange={handleChange}
-              className="w-4 h-4 rounded text-indigo-500 focus:ring-indigo-500/50 bg-slate-800 border-slate-700"
+              style={{
+                width: '18px',
+                height: '18px',
+                accentColor: 'var(--accent)',
+                cursor: 'pointer',
+              }}
             />
-            <label htmlFor="availability-active-checkbox" className="text-xs text-slate-300 font-medium">
+            <label
+              htmlFor="availability-active-checkbox"
+              style={{
+                fontSize: '13px',
+                fontWeight: 600,
+                color: 'var(--text-h)',
+                cursor: 'pointer',
+              }}
+            >
               Window is active and open for slot calculation
             </label>
           </div>
 
           {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '10px',
+              paddingTop: '16px',
+              borderTop: '1px solid var(--border)',
+            }}
+          >
             <button
               id="availability-cancel-btn"
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-xl transition-colors"
+              style={{
+                padding: '9px 16px',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                background: 'var(--code-bg)',
+                color: 'var(--text-h)',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
             >
               Cancel
             </button>
@@ -259,16 +473,40 @@ export default function AvailabilityModal({
               id="availability-submit-btn"
               type="submit"
               disabled={loading}
-              className="px-5 py-2 text-xs font-medium text-white bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 rounded-xl shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              style={{
+                padding: '9px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'var(--accent)',
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 8px rgba(99, 102, 241, 0.25)',
+                transition: 'all 0.15s ease',
+              }}
             >
               {loading ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTopColor: '#fff',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                    }}
+                  />
                   <span>Saving...</span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-4 h-4" />
+                  <CheckCircle2 size={16} />
                   <span>{isEditing ? 'Update Window' : 'Create Window'}</span>
                 </>
               )}

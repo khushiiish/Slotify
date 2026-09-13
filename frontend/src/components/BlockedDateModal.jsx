@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, CalendarX, User, AlignLeft, CheckCircle2 } from 'lucide-react';
+import { X, CalendarX, User, AlignLeft, CheckCircle2, Calendar } from 'lucide-react';
 
 export default function BlockedDateModal({
   isOpen,
@@ -29,7 +29,6 @@ export default function BlockedDateModal({
         reason: blockedDateToEdit.reason || '',
       });
     } else {
-      // Default to tomorrow's date
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       setFormData({
@@ -80,54 +79,136 @@ export default function BlockedDateModal({
   return (
     <div
       id="blocked-date-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '16px',
+        boxSizing: 'border-box',
+      }}
     >
       <div
         id="blocked-date-modal-content"
-        className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
+        style={{
+          background: 'var(--bg)',
+          borderRadius: '12px',
+          border: '1px solid var(--border)',
+          width: '100%',
+          maxWidth: '520px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          textAlign: 'left',
+          boxSizing: 'border-box',
+          maxHeight: '90vh',
+        }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800 bg-slate-900/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
-              <CalendarX className="w-5 h-5" />
+        <div
+          style={{
+            padding: '18px 24px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'var(--code-bg)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '8px',
+                background: 'rgba(244, 63, 94, 0.15)',
+                color: '#fb7185',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <CalendarX size={20} />
             </div>
             <div>
-              <h2 id="blocked-date-modal-title" className="text-lg font-semibold text-white">
+              <h2
+                id="blocked-date-modal-title"
+                style={{
+                  margin: 0,
+                  fontSize: '17px',
+                  fontWeight: 700,
+                  color: 'var(--text-h)',
+                  letterSpacing: '-0.2px',
+                }}
+              >
                 {isEditing ? 'Edit Blocked Date' : 'Block a Date'}
               </h2>
-              <p className="text-xs text-slate-400">
+              <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--text)' }}>
                 Mark dates unavailable for booking platform-wide or for specific staff
               </p>
             </div>
           </div>
           <button
+            type="button"
             id="blocked-date-close-btn"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text)',
+              cursor: 'pointer',
+              padding: '6px',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title="Close dialog"
           >
-            <X className="w-5 h-5" />
+            <X size={20} />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} style={{ padding: '24px', overflowY: 'auto' }}>
           {error && (
             <div
               id="blocked-date-modal-error"
-              className="p-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl"
+              style={{
+                marginBottom: '18px',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#ef4444',
+                fontSize: '13px',
+              }}
             >
               {error}
             </div>
           )}
 
           {/* Scope: Business vs Staff */}
-          <div>
+          <div style={{ marginBottom: '18px' }}>
             <label
               htmlFor="blocked-date-staff-select"
-              className="flex items-center gap-2 text-xs font-medium text-slate-300 mb-2"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--text-h)',
+                marginBottom: '6px',
+              }}
             >
-              <User className="w-3.5 h-3.5 text-rose-400" />
+              <User size={14} color="#fb7185" />
               Blocked Scope
             </label>
             <select
@@ -135,24 +216,41 @@ export default function BlockedDateModal({
               name="staffId"
               value={formData.staffId}
               onChange={handleChange}
-              className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                background: 'var(--bg)',
+                color: 'var(--text-h)',
+                fontSize: '13px',
+                boxSizing: 'border-box',
+              }}
             >
               <option value="">🏢 Entire Business (All Staff Blocked)</option>
               {staffList.map((st) => (
                 <option key={st._id} value={st._id}>
-                  👤 {st.name} ({st.status})
+                  👤 Staff: {st.name} ({st.status})
                 </option>
               ))}
             </select>
           </div>
 
           {/* Date Picker */}
-          <div>
+          <div style={{ marginBottom: '18px' }}>
             <label
               htmlFor="blocked-date-picker"
-              className="flex items-center gap-2 text-xs font-medium text-slate-300 mb-2"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--text-h)',
+                marginBottom: '6px',
+              }}
             >
-              <CalendarX className="w-3.5 h-3.5 text-rose-400" />
+              <Calendar size={14} color="#fb7185" />
               Date to Block
             </label>
             <input
@@ -162,17 +260,34 @@ export default function BlockedDateModal({
               value={formData.date}
               onChange={handleChange}
               required
-              className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                background: 'var(--bg)',
+                color: 'var(--text-h)',
+                fontSize: '13px',
+                boxSizing: 'border-box',
+              }}
             />
           </div>
 
           {/* Reason */}
-          <div>
+          <div style={{ marginBottom: '22px' }}>
             <label
               htmlFor="blocked-date-reason"
-              className="flex items-center gap-2 text-xs font-medium text-slate-300 mb-2"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--text-h)',
+                marginBottom: '6px',
+              }}
             >
-              <AlignLeft className="w-3.5 h-3.5 text-rose-400" />
+              <AlignLeft size={14} color="#fb7185" />
               Reason (Optional)
             </label>
             <input
@@ -181,19 +296,46 @@ export default function BlockedDateModal({
               name="reason"
               value={formData.reason}
               onChange={handleChange}
-              placeholder="e.g. National Holiday, Equipment Maintenance, Vacation"
+              placeholder="e.g. National Holiday, Studio Renovation, Staff Leave"
               maxLength={200}
-              className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                background: 'var(--bg)',
+                color: 'var(--text-h)',
+                fontSize: '13px',
+                boxSizing: 'border-box',
+              }}
             />
           </div>
 
           {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '10px',
+              paddingTop: '16px',
+              borderTop: '1px solid var(--border)',
+            }}
+          >
             <button
               id="blocked-date-cancel-btn"
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-xl transition-colors"
+              style={{
+                padding: '9px 16px',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                background: 'var(--code-bg)',
+                color: 'var(--text-h)',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
             >
               Cancel
             </button>
@@ -201,16 +343,39 @@ export default function BlockedDateModal({
               id="blocked-date-submit-btn"
               type="submit"
               disabled={loading}
-              className="px-5 py-2 text-xs font-medium text-white bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 rounded-xl shadow-lg shadow-rose-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              style={{
+                padding: '9px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#fb7185',
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 8px rgba(244, 63, 94, 0.25)',
+              }}
             >
               {loading ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTopColor: '#fff',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                    }}
+                  />
                   <span>Saving...</span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-4 h-4" />
+                  <CheckCircle2 size={16} />
                   <span>{isEditing ? 'Update Blocked Date' : 'Confirm Block'}</span>
                 </>
               )}
